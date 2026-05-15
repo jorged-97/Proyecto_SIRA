@@ -19,9 +19,10 @@ from utils.dialogs import crear_msgbox
 from utils.archivos import abrir_archivo
 from utils.exportar import (
     generar_constancia_trabajo,
-    exportar_tabla_excel, 
+    exportar_tabla_excel,
     exportar_empleados_excel,
-    generar_reporte_rac
+    generar_reporte_rac,
+    generar_cuadratura_excel
 )
 
 def _seleccionar_ui_gestion_empleados(ui_variant: str):
@@ -109,8 +110,9 @@ class GestionEmpleadosPage(QWidget):
         #menu_exportar_emple.addAction("Constancia de trabajo PDF", self.exportar_constancia_empleado)
         menu_exportar_emple.addAction("Exportar tabla filtrada a Excel", self.exportar_excel_empleados)
         menu_exportar_emple.addAction("Exportar BD completa a Excel", self.exportar_excel_empleados_bd)
-        #menu_exportar_emple.addSeparator()
-        #menu_exportar_emple.addAction("Reporte RAC (Ministerio)", self.exportar_reporte_rac)
+        menu_exportar_emple.addSeparator()
+        menu_exportar_emple.addAction("Reporte RAC (Ministerio)", self.exportar_reporte_rac)
+        menu_exportar_emple.addAction("Cuadratura (Maternal, Inicial y Primaria)", self.exportar_cuadratura)
         self.btnExportar_emple.setMenu(menu_exportar_emple)
         
     def actualizar_conteo(self):
@@ -441,15 +443,27 @@ class GestionEmpleadosPage(QWidget):
             ).exec()
             
             abrir_archivo(archivo)
-            
+
         except Exception as e:
             crear_msgbox(
-                self,
-                "Error",
+                self, "Error",
                 f"No se pudo generar la constancia:\n{e}",
                 QMessageBox.Icon.Critical
             ).exec()
-    
+
+    def exportar_cuadratura(self):
+        """Genera la Cuadratura Maternal, Inicial y Primaria en formato Excel."""
+        try:
+            archivo = generar_cuadratura_excel(self)
+            if archivo:
+                abrir_archivo(archivo)
+        except Exception as e:
+            crear_msgbox(
+                self, "Error",
+                f"No se pudo generar la cuadratura:\n{e}",
+                QMessageBox.Icon.Critical
+            ).exec()
+
     def exportar_excel_empleados(self):
         """Exporta la tabla filtrada actual a Excel."""
         try:

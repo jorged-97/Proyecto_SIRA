@@ -13,7 +13,7 @@ from PySide6.QtPdf import QPdfDocument
 from models.dashboard_model import DashboardModel
 from utils.exportar import (
     exportar_reporte_pdf,
-    generar_constancia_estudios, generar_buena_conducta,
+    generar_constancia_estudios, generar_constancia_estudios_docx, generar_buena_conducta,
     generar_constancia_inscripcion, generar_constancia_prosecucion_inicial,
     generar_constancia_trabajo, generar_constancia_retiro,
     generar_historial_estudiante_pdf, generar_historial_notas_pdf,
@@ -287,6 +287,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
         # Constancias disponibles por población
         self._constancias_estudiantes = [
             "Constancia de estudios",
+            "Constancia de estudios (DOCX)",
             "Constancia de inscripción",
             "Constancia de buena conducta",
             "Constancia de prosecución inicial",
@@ -1095,6 +1096,9 @@ class MainWindow(QMainWindow, UiMainWindowBase):
 
                 if constancia == "Constancia de estudios":
                     archivo = generar_constancia_estudios(estudiante, institucion)
+
+                elif constancia == "Constancia de estudios (DOCX)":
+                    archivo = generar_constancia_estudios_docx(estudiante, institucion)
 
                 elif constancia == "Constancia de inscripción":
                     archivo = generar_constancia_inscripcion(estudiante, institucion)

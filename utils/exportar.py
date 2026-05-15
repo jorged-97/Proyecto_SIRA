@@ -1,5 +1,6 @@
 import os
 import io
+import tempfile
 from datetime import date, datetime
 
 from reportlab.platypus import (
@@ -17,8 +18,14 @@ from paths import ICON_DIR
 from utils.logo_manager import obtener_logo_bytes
 from models.institucion_model import InstitucionModel
 from models.secciones_model import SeccionesModel
+from models.anio_model import AnioEscolarModel
+from models.emple_model import EmpleadoModel
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from docx import Document
+from docx.shared import Inches, Pt, Cm
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from utils.edad import calcular_edad
 from utils.dialogs import crear_msgbox
 
@@ -418,6 +425,246 @@ def generar_constancia_estudios(estudiante: dict, institucion: dict) -> str:
         
     except Exception as e:
         raise IOError(f"Error generando PDF: {e}")
+
+
+def generar_constancia_estudios_docx(estudiante: dict, institucion: dict) -> str:
+    """Genera constancia de estudios en DOCX para un estudiante."""
+    campos_est = ["Nombres", "Apellidos", "Cédula", "Grado", "Sección"]
+    valido, mensaje = validar_datos_exportacion(estudiante, campos_est)
+    if not valido:
+        raise ValueError(f"Datos de estudiante incompletos: {mensaje}")
+
+    campos_inst = ["director", "director_ci", "nombre"]
+    valido, mensaje = validar_datos_exportacion(institucion, campos_inst)
+    if not valido:
+        raise ValueError(f"Datos de institución incompletos: {mensaje}")
+
+    estudiante["Nombres"] = str(estudiante["Nombres"]).strip().upper()
+    estudiante["Apellidos"] = str(estudiante["Apellidos"]).strip().upper()
+    cedula_normalizada = normalizar_cedula(estudiante["Cédula"], es_estudiante=True)
+    director_ci = normalizar_cedula(institucion['director_ci'])
+
+    carpeta = os.path.join(os.getcwd(), "exportados", "Constancias de estudios DOCX")
+    ok, msg = crear_carpeta_segura(carpeta)
+    if not ok:
+        raise IOError(msg)
+
+    nombre_base = sanitizar_nombre_archivo(f"Constancia_{estudiante['Cédula']}")
+    nombre_archivo = os.path.join(carpeta, f"{nombre_base}.docx")
+
+    try:
+        doc = Document()
+
+        section = doc.sections[0]
+        section.page_width = Cm(21.59)
+        section.page_height = Cm(27.94)
+        section.top_margin = Cm(4.5)
+        section.bottom_margin = Cm(1.5)
+        section.left_margin = Cm(2.5)
+        section.right_margin = Cm(2.5)
+
+        logo_temp_path = None
+        try:
+            logo_datos = obtener_logo_bytes()
+            if logo_datos:
+                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                    tmp.write(logo_datos)
+                    logo_temp_path = tmp.name
+        except Exception:
+            pass
+
+        if not logo_temp_path:
+            logo_path_local = os.path.join(ICON_DIR, "logo_escuela_fondo.png")
+            if os.path.exists(logo_path_local):
+                logo_temp_path = logo_path_local
+
+        if logo_temp_path and os.path.exists(logo_temp_path):
+            p_logo = doc.add_paragraph()
+            p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run_logo = p_logo.add_run()
+            run_logo.add_picture(logo_temp_path, width=Inches(1.0))
+
+        inst_data = InstitucionModel.obtener_por_id(1)
+        nombre_inst = str(inst_data.get("nombre", "")).upper() if inst_data else ""
+        codigo_inst = str(inst_data.get("codigo_dea", "")) if inst_data else ""
+
+        lineas_membrete = [
+            "REPÚBLICA BOLIVARIANA DE VENEZUELA",
+            "MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN",
+            nombre_inst,
+            f"CÓDIGO DEA: {codigo_inst}",
+            "PUERTO LA CRUZ, EDO. ANZOÁTEGUI"
+        ]
+        for linea in lineas_membrete:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.space_after = Pt(1)
+            p.paragraph_format.space_before = Pt(0)
+            run = p.add_run(linea)
+            run.font.size = Pt(10)
+            run.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(12)
+
+        p_titulo = doc.add_paragraph()
+        p_titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_titulo.paragraph_format.space_after = Pt(12)
+        run_titulo = p_titulo.add_run("CONSTANCIA DE ESTUDIOS")
+        run_titulo.bold = True
+        run_titulo.font.size = Pt(16)
+        run_titulo.font.name = "Arial"
+
+        p_texto = doc.add_paragraph()
+        p_texto.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_texto.paragraph_format.space_after = Pt(0)
+
+        run1 = p_texto.add_run("El suscrito, Director ")
+        run1.font.size = Pt(12)
+        run1.font.name = "Arial"
+        run2 = p_texto.add_run(f"PROF. {institucion['director'].upper()}")
+        run2.bold = True
+        run2.font.size = Pt(12)
+        run2.font.name = "Arial"
+        run3 = p_texto.add_run(", portador de la Cédula de Identidad ")
+        run3.font.size = Pt(12)
+        run3.font.name = "Arial"
+        run4 = p_texto.add_run(director_ci)
+        run4.bold = True
+        run4.font.size = Pt(12)
+        run4.font.name = "Arial"
+        run5 = p_texto.add_run(f", de la {institucion['nombre']}, hace constar que el(la) estudiante ")
+        run5.font.size = Pt(12)
+        run5.font.name = "Arial"
+        run6 = p_texto.add_run(f"{estudiante['Apellidos']} {estudiante['Nombres']}")
+        run6.bold = True
+        run6.font.size = Pt(12)
+        run6.font.name = "Arial"
+        run7 = p_texto.add_run(", portador de la cédula escolar ")
+        run7.font.size = Pt(12)
+        run7.font.name = "Arial"
+        run8 = p_texto.add_run(cedula_normalizada)
+        run8.bold = True
+        run8.font.size = Pt(12)
+        run8.font.name = "Arial"
+        run9 = p_texto.add_run(f", cursa actualmente el ")
+        run9.font.size = Pt(12)
+        run9.font.name = "Arial"
+        run10 = p_texto.add_run(f"{estudiante['Grado']} grado Sección '{estudiante['Sección']}'")
+        run10.bold = True
+        run10.font.size = Pt(12)
+        run10.font.name = "Arial"
+        run11 = p_texto.add_run(" de Educación Primaria en esta institución.")
+        run11.font.size = Pt(12)
+        run11.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(20)
+
+        fecha_hoy = date.today()
+        dia = fecha_hoy.day
+        mes_nombre = fecha_hoy.strftime("%B").upper()
+        meses = {
+            'JANUARY': 'ENERO', 'FEBRUARY': 'FEBRERO', 'MARCH': 'MARZO',
+            'APRIL': 'ABRIL', 'MAY': 'MAYO', 'JUNE': 'JUNIO',
+            'JULY': 'JULIO', 'AUGUST': 'AGOSTO', 'SEPTEMBER': 'SEPTIEMBRE',
+            'OCTOBER': 'OCTUBRE', 'NOVEMBER': 'NOVIEMBRE', 'DECEMBER': 'DICIEMBRE'
+        }
+        mes_es = meses.get(mes_nombre, mes_nombre)
+        anio = fecha_hoy.year
+
+        p_fecha = doc.add_paragraph()
+        p_fecha.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_fecha.paragraph_format.space_after = Pt(0)
+        rf1 = p_fecha.add_run("Certificado que se expide en ")
+        rf1.font.size = Pt(12)
+        rf1.font.name = "Arial"
+        rf2 = p_fecha.add_run("PUERTO LA CRUZ")
+        rf2.bold = True
+        rf2.font.size = Pt(12)
+        rf2.font.name = "Arial"
+        rf3 = p_fecha.add_run(", a los ")
+        rf3.font.size = Pt(12)
+        rf3.font.name = "Arial"
+        rf4 = p_fecha.add_run(str(dia))
+        rf4.bold = True
+        rf4.font.size = Pt(12)
+        rf4.font.name = "Arial"
+        rf5 = p_fecha.add_run(" días del mes de ")
+        rf5.font.size = Pt(12)
+        rf5.font.name = "Arial"
+        rf6 = p_fecha.add_run(mes_es)
+        rf6.bold = True
+        rf6.font.size = Pt(12)
+        rf6.font.name = "Arial"
+        rf7 = p_fecha.add_run(" de ")
+        rf7.font.size = Pt(12)
+        rf7.font.name = "Arial"
+        rf8 = p_fecha.add_run(str(anio))
+        rf8.bold = True
+        rf8.font.size = Pt(12)
+        rf8.font.name = "Arial"
+
+        for _ in range(5):
+            sp = doc.add_paragraph()
+            sp.paragraph_format.space_after = Pt(0)
+            sp.paragraph_format.space_before = Pt(0)
+
+        p_linea = doc.add_paragraph()
+        p_linea.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_linea.paragraph_format.space_after = Pt(3)
+        run_linea = p_linea.add_run("________________________")
+        run_linea.font.size = Pt(12)
+        run_linea.font.name = "Arial"
+
+        p_director = doc.add_paragraph()
+        p_director.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_director.paragraph_format.space_after = Pt(3)
+        run_dir = p_director.add_run(f"Prof. {institucion['director']}")
+        run_dir.font.size = Pt(12)
+        run_dir.font.name = "Arial"
+
+        p_ci = doc.add_paragraph()
+        p_ci.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_ci.paragraph_format.space_after = Pt(3)
+        run_ci = p_ci.add_run(f"C.I. {director_ci}")
+        run_ci.font.size = Pt(12)
+        run_ci.font.name = "Arial"
+
+        p_cargo = doc.add_paragraph()
+        p_cargo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run_cargo = p_cargo.add_run("Director")
+        run_cargo.font.size = Pt(12)
+        run_cargo.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(6)
+
+        if inst_data:
+            direccion = str(inst_data.get("direccion", "")).upper()
+            telefono = str(inst_data.get("telefono", ""))
+            correo = str(inst_data.get("correo", "")).upper()
+
+            line1 = f"DIRECCIÓN: {direccion}" if direccion else ""
+            line2 = f"TELÉFONO: {telefono} | CORREO: {correo}" if telefono or correo else ""
+
+            for linea_pie in [line1, line2]:
+                if linea_pie.strip():
+                    p_pie = doc.add_paragraph()
+                    p_pie.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    p_pie.paragraph_format.space_after = Pt(1)
+                    run_pie = p_pie.add_run(linea_pie)
+                    run_pie.font.size = Pt(10)
+                    run_pie.font.name = "Arial"
+
+        doc.save(nombre_archivo)
+        return nombre_archivo
+
+    except Exception as e:
+        raise IOError(f"Error generando DOCX: {e}")
+    finally:
+        if logo_temp_path and logo_temp_path != os.path.join(ICON_DIR, "logo_escuela_fondo.png"):
+            try:
+                os.unlink(logo_temp_path)
+            except OSError:
+                pass
 
 
 def generar_buena_conducta(estudiante: dict, institucion: dict, anio_escolar: dict) -> str:
@@ -2134,6 +2381,527 @@ def generar_reporte_rac(parent, empleados: list, institucion: dict) -> str:
             parent,
             "Error",
             f"Error al generar reporte RAC:\n{str(e)}",
+            QMessageBox.Icon.Critical
+        ).exec()
+        return None
+
+def generar_cuadratura_excel(parent) -> str:
+    """Genera la Cuadratura Maternal, Inicial y Primaria en formato Excel"""
+    try:
+        anio = AnioEscolarModel.obtener_actual()
+        if not anio:
+            crear_msgbox(
+                parent, "Error",
+                "No se pudo obtener el año escolar actual.",
+                QMessageBox.Icon.Warning
+            ).exec()
+            return None
+
+        secciones = SeccionesModel.obtener_todas(anio['id'], solo_activas=True)
+        empleados = EmpleadoModel.listar_activos()
+        institucion = InstitucionModel.obtener_por_id(1)
+
+        if not empleados:
+            crear_msgbox(
+                parent, "Sin datos",
+                "No hay empleados activos para generar la cuadratura.",
+                QMessageBox.Icon.Warning
+            ).exec()
+            return None
+
+        fecha_actual = datetime.now().strftime("%Y%m%d")
+        nombre_sugerido = f"Cuadratura_{fecha_actual}.xlsx"
+        archivo, _ = QFileDialog.getSaveFileName(
+            parent, "Guardar Cuadratura",
+            nombre_sugerido, "Archivos Excel (*.xlsx)"
+        )
+        if not archivo:
+            return None
+
+        codigo_dea = institucion.get('codigo_dea', '') if institucion else ''
+        nombre_plantel = institucion.get('nombre', '') if institucion else ''
+
+        GRADO_MAP = {
+            'MATERNAL': {
+                'label': 'MATERNAL', 'niveles': [], 'grados': [],
+                'section_prefix': 'GRUPO', 'max_sections': 4,
+            },
+            'INICIAL': {
+                'label': 'INICIAL', 'niveles': ['Inicial'],
+                'grados': SeccionesModel.GRADOS_INICIAL,
+                'section_prefix': 'SECCION', 'max_sections': 5,
+            },
+            '1ERO': {
+                'label': '1 ER GRADO', 'niveles': ['Primaria'],
+                'grados': ['1ero'], 'section_prefix': 'SECCION',
+                'max_sections': 5,
+            },
+            '2DO': {
+                'label': '2DO GRADO', 'niveles': ['Primaria'],
+                'grados': ['2do'], 'section_prefix': 'SECCION',
+                'max_sections': 5,
+            },
+            '3ERO': {
+                'label': '3 ER GRADO', 'niveles': ['Primaria'],
+                'grados': ['3ero'], 'section_prefix': 'SECCION',
+                'max_sections': 5,
+            },
+            '4TO': {
+                'label': '4TO GRADO', 'niveles': ['Primaria'],
+                'grados': ['4to'], 'section_prefix': 'SECCION',
+                'max_sections': 5,
+            },
+            '5TO': {
+                'label': '5TO GRADO', 'niveles': ['Primaria'],
+                'grados': ['5to'], 'section_prefix': 'SECCION',
+                'max_sections': 5,
+            },
+        '6TO': {
+            'label': '6TO GRADO', 'niveles': ['Primaria'],
+            'grados': ['6to'], 'section_prefix': 'SECCION',
+            'max_sections': 5,
+        },
+    }
+        BLOCK_ORDER = ['MATERNAL', 'INICIAL', '1ERO', '2DO', '3ERO', '4TO', '5TO', '6TO']
+
+        def _secciones_del_bloque(bloque_key):
+            """Obtiene las secciones de BD que corresponden a un bloque."""
+            cfg = GRADO_MAP[bloque_key]
+            if bloque_key == 'MATERNAL':
+                return []
+            out = []
+            for s in secciones:
+                if s['nivel'] in cfg['niveles'] and s['grado'] in cfg['grados']:
+                    out.append(s)
+            return out
+
+        def _letras_secciones_bloque(bloque_key):
+            """Devuelve lista de letras de sección para un bloque (ej: ['A','B'])."""
+            s_bd = _secciones_del_bloque(bloque_key)
+            if not s_bd:
+                return []
+            letras = sorted(set(s['letra'] for s in s_bd))
+            return letras
+
+        bloque_secciones = {}
+        bloque_letras = {}
+        bloque_col_start = {}
+        bloque_col_end = {}
+        bloque_grade_cols = {}
+        bloque_sec_cols = {}
+
+        col_cursor = 8
+        for bk in BLOCK_ORDER:
+            cfg = GRADO_MAP[bk]
+            letras = _letras_secciones_bloque(bk)
+            n_grade = min(max(len(letras), 1), cfg['max_sections'])
+            n_sec = min(max(len(letras), 1), cfg['max_sections'])
+
+            bloque_secciones[bk] = _secciones_del_bloque(bk)
+            bloque_letras[bk] = letras
+            bloque_col_start[bk] = col_cursor
+            bloque_grade_cols[bk] = (col_cursor, col_cursor + n_grade - 1)
+
+            if bk == 'MATERNAL':
+                bloque_sec_cols[bk] = None
+                bloque_col_end[bk] = col_cursor + n_grade - 1
+                col_cursor = bloque_col_end[bk] + 1
+            else:
+                sec_start = col_cursor + n_grade + 1
+                bloque_sec_cols[bk] = (sec_start, sec_start + n_sec - 1)
+                bloque_col_end[bk] = sec_start + n_sec - 1
+                col_cursor = bloque_col_end[bk] + 1
+
+        last_data_col = bloque_col_end[BLOCK_ORDER[-1]]
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Cuadratura"
+
+        font_title = Font(name='Arial', size=12, bold=True)
+        font_label = Font(name='Arial', size=12, bold=True)
+        font_section_row5 = Font(name='Arial', size=12, bold=True)
+        font_section_row6 = Font(name='Arial', size=10, bold=True)
+        font_section_row6_small = Font(name='Arial', size=8, bold=True)
+        font_row7 = Font(name='Arial', size=10, bold=True)
+        font_data = Font(name='Arial', size=10)
+        font_data_bold = Font(name='Arial', size=10, bold=True)
+
+        align_center = Alignment(horizontal='center', vertical='center')
+        align_center_rot90 = Alignment(horizontal='center', vertical='center', text_rotation=90)
+        align_left_rot90 = Alignment(horizontal='left', vertical='center', text_rotation=90)
+        align_left = Alignment(horizontal='left', vertical='center')
+        align_center_wrap = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+        side_thick = Side(style='thick')
+        side_thin = Side(style='thin')
+        side_medium = Side(style='medium')
+        border_header_full = Border(
+            left=side_thick, right=side_thin,
+            top=side_thick, bottom=side_thick
+        )
+        border_header_right = Border(
+            left=side_thin, right=side_thick,
+            top=side_thick, bottom=side_thick
+        )
+        border_data_full = Border(
+            left=side_thick, right=side_thin,
+            top=side_thin, bottom=side_thin
+        )
+        border_data_right = Border(
+            left=side_thin, right=side_thick,
+            top=side_thin, bottom=side_thin
+        )
+        border_data_all_thin = Border(
+            left=side_thin, right=side_thin,
+            top=side_thin, bottom=side_thin
+        )
+        border_data_first_last = Border(
+            left=side_thick, right=side_thick,
+            top=side_thin, bottom=side_thin
+        )
+        border_matricula = Border(
+            left=side_thin, right=side_thin,
+            top=side_medium, bottom=side_medium
+        )
+
+        light_fill = PatternFill(start_color="D9E2F3", end_color="D9E2F3", fill_type="solid")
+
+        # ── Row 2: Título ──
+        ws.cell(row=2, column=8, value="CUADRATURA MATERNAL, INICIAL Y ").font = font_title
+        ws.cell(row=2, column=8).alignment = align_center
+        ws.merge_cells(
+            start_row=2, start_column=8,
+            end_row=2, end_column=last_data_col
+        )
+
+        # ── Row 3: Info institucional ──
+        col3 = 8
+        ws.cell(row=3, column=col3, value="Codigo Interno del Plantel").font = font_label
+        ws.cell(row=3, column=col3).alignment = align_center
+        cod_end = min(col3 + 8, last_data_col)
+        ws.merge_cells(start_row=3, start_column=col3, end_row=3, end_column=cod_end)
+
+        col3 = cod_end + 1
+        ws.cell(row=3, column=col3, value=str(codigo_dea)).font = font_label
+        ws.cell(row=3, column=col3).alignment = align_center
+        dea_end = min(col3 + 5, last_data_col)
+        ws.merge_cells(start_row=3, start_column=col3, end_row=3, end_column=dea_end)
+
+        col3 = dea_end + 1
+        ws.cell(row=3, column=col3, value="Nombre del Plantel:").font = font_label
+        ws.cell(row=3, column=col3).alignment = align_center
+        np_end = min(col3 + 6, last_data_col)
+        ws.merge_cells(start_row=3, start_column=col3, end_row=3, end_column=np_end)
+
+        col3 = np_end + 1
+        ws.cell(row=3, column=col3, value=nombre_plantel.upper()).font = font_label
+        ws.cell(row=3, column=col3).alignment = Alignment(horizontal='left', vertical='center')
+        if col3 <= last_data_col:
+            ws.merge_cells(start_row=3, start_column=col3, end_row=3, end_column=last_data_col)
+
+        # ── Row 4: Vacía ──
+
+        # ── Row 5: Grade labels + SECCIONES labels ──
+        # ── Row 6: Section sub-labels (rotated 90°) ──
+        # ── Row 7: C.I. / Nombre del Docente / MATRICULA ──
+
+        for bk in BLOCK_ORDER:
+            cfg = GRADO_MAP[bk]
+            letras = bloque_letras[bk]
+            cs = bloque_col_start[bk]
+            grade_start, grade_end = bloque_grade_cols[bk]
+
+            n_grade = grade_end - grade_start + 1
+
+            # Row 5: grade label
+            ws.cell(row=5, column=grade_start, value=cfg['label']).font = font_section_row5
+            ws.cell(row=5, column=grade_start).alignment = align_center
+            if grade_end > grade_start:
+                ws.merge_cells(
+                    start_row=5, start_column=grade_start,
+                    end_row=5, end_column=grade_end
+                )
+
+            # Row 6: section sub-labels
+            for i in range(n_grade):
+                col = grade_start + i
+                if cfg['section_prefix'] == 'GRUPO':
+                    label = f"GRUPO {i + 1}"
+                else:
+                    if i < len(letras):
+                        label = f"SECCION {letras[i]}"
+                    else:
+                        label = f"SECCION {chr(65 + i)}"
+                ws.cell(row=6, column=col, value=label).font = font_section_row6
+                ws.cell(row=6, column=col).alignment = align_left_rot90
+
+            # Row 7: MATRICULA (merged across grade + gap + secciones)
+            if bloque_sec_cols[bk] is not None:
+                sec_start, sec_end = bloque_sec_cols[bk]
+                n_sec = sec_end - sec_start + 1
+
+                # Row 5: SECCIONES label
+                ws.cell(row=5, column=sec_start, value="SECCIONES").font = font_section_row5
+                ws.cell(row=5, column=sec_start).alignment = align_center
+                if sec_end > sec_start:
+                    ws.merge_cells(
+                        start_row=5, start_column=sec_start,
+                        end_row=5, end_column=sec_end
+                    )
+
+                # Row 6: secciones sub-labels (empty, just formatting)
+                for i in range(n_sec):
+                    col = sec_start + i
+                    ws.cell(row=6, column=col).font = font_section_row6
+                    ws.cell(row=6, column=col).alignment = align_left_rot90
+
+                # Row 7: MATRICULA merged across all cols in block
+                mat_start = grade_start
+                mat_end = sec_end
+                ws.cell(row=7, column=mat_start, value="MATRICULA").font = font_row7
+                ws.cell(row=7, column=mat_start).alignment = align_center
+                if mat_end > mat_start:
+                    ws.merge_cells(
+                        start_row=7, start_column=mat_start,
+                        end_row=7, end_column=mat_end
+                    )
+                # Apply matricula border to all cells in merge
+                for c in range(mat_start, mat_end + 1):
+                    ws.cell(row=7, column=c).border = border_matricula
+            else:
+                # MATERNAL: no separate SECCIONES area
+                mat_start = grade_start
+                mat_end = grade_end
+                ws.cell(row=7, column=mat_start, value="MATRICULA").font = font_row7
+                ws.cell(row=7, column=mat_start).alignment = align_center
+                if mat_end > mat_start:
+                    ws.merge_cells(
+                        start_row=7, start_column=mat_start,
+                        end_row=7, end_column=mat_end
+                    )
+                for c in range(mat_start, mat_end + 1):
+                    ws.cell(row=7, column=c).border = border_matricula
+
+        # ── Fixed columns A-G headers (rows 6-7) ──
+        # A (col 1): N° - no header needed, just numbering
+        # B (col 2): C.I.
+        ws.cell(row=7, column=2, value="C.I.").font = font_row7
+        ws.cell(row=7, column=2).alignment = align_center
+        ws.cell(row=7, column=2).border = border_header_full
+        # C (col 3): Nombre del Docente
+        ws.cell(row=7, column=3, value="Nombre del Docente").font = font_row7
+        ws.cell(row=7, column=3).alignment = align_center
+        ws.cell(row=7, column=3).border = border_header_right
+
+        # D (col 4): CARGA HORARIA
+        ws.cell(row=6, column=4, value="CARGA HORARIA (RECIBO DE PAGO)").font = font_section_row6_small
+        ws.cell(row=6, column=4).alignment = align_center_rot90
+        ws.merge_cells(start_row=6, start_column=4, end_row=7, end_column=4)
+        ws.cell(row=6, column=4).border = border_header_full
+
+        # E (col 5): TITULAR/INTERINO
+        ws.cell(row=6, column=5, value="TITULAR/ INTERINO").font = font_section_row6_small
+        ws.cell(row=6, column=5).alignment = align_center_rot90
+        ws.merge_cells(start_row=6, start_column=5, end_row=7, end_column=5)
+        ws.cell(row=6, column=5).border = border_header_full
+
+        # F (col 6): TURNO
+        ws.cell(row=6, column=6, value="TURNO (MAÑANA, TARDE. INTEGRAL)").font = font_section_row6_small
+        ws.cell(row=6, column=6).alignment = align_center_rot90
+        ws.merge_cells(start_row=6, start_column=6, end_row=7, end_column=6)
+        ws.cell(row=6, column=6).border = border_header_full
+
+        # G (col 7): TIPO DE PERSONAL
+        ws.cell(row=6, column=7, value="TIPO DE PERSONAL (Doc,Adm,Obr)").font = font_section_row6_small
+        ws.cell(row=6, column=7).alignment = align_center_rot90
+        ws.merge_cells(start_row=6, start_column=7, end_row=7, end_column=7)
+        ws.cell(row=6, column=7).border = border_header_right
+
+        # Apply borders to row 5 header cells
+        for bk in BLOCK_ORDER:
+            grade_start, grade_end = bloque_grade_cols[bk]
+            for c in range(grade_start, grade_end + 1):
+                cell = ws.cell(row=5, column=c)
+                if c == grade_start:
+                    cell.border = border_header_full
+                elif c == grade_end and bloque_sec_cols[bk] is None:
+                    cell.border = border_header_right
+                else:
+                    cell.border = border_header_full
+
+            if bloque_sec_cols[bk] is not None:
+                sec_start, sec_end = bloque_sec_cols[bk]
+                for c in range(sec_start, sec_end + 1):
+                    cell = ws.cell(row=5, column=c)
+                    if c == sec_end:
+                        cell.border = border_header_right
+                    else:
+                        cell.border = border_header_full
+
+        # ── Row heights ──
+        ws.row_dimensions[3].height = 21.75
+        ws.row_dimensions[4].height = 16.5
+        ws.row_dimensions[5].height = 17.25
+        ws.row_dimensions[6].height = 144.75
+        ws.row_dimensions[7].height = 17.25
+
+        # ── Column widths ──
+        ws.column_dimensions['A'].width = 4.4
+        ws.column_dimensions['B'].width = 14.1
+        ws.column_dimensions['C'].width = 33.7
+        ws.column_dimensions['D'].width = 3.6
+        ws.column_dimensions['E'].width = 4.7
+        ws.column_dimensions['F'].width = 3.7
+        ws.column_dimensions['G'].width = 3.7
+
+        for bk in BLOCK_ORDER:
+            grade_start, grade_end = bloque_grade_cols[bk]
+            for c in range(grade_start, grade_end + 1):
+                ws.column_dimensions[get_column_letter(c)].width = 3.7
+
+            if bloque_sec_cols[bk] is not None:
+                sec_start, sec_end = bloque_sec_cols[bk]
+                # Gap column between grade and secciones
+                ws.column_dimensions[get_column_letter(sec_start - 1)].width = 0.2
+                for c in range(sec_start, sec_end + 1):
+                    ws.column_dimensions[get_column_letter(c)].width = 3.7
+
+        # ── Employee data rows ──
+        data_start_row = 8
+
+        # Build a mapping: (docente_id) -> {bloque_key: seccion_col}
+        docente_seccion_map = {}
+        for bk in BLOCK_ORDER:
+            cfg = GRADO_MAP[bk]
+            letras = bloque_letras[bk]
+            grade_start, grade_end = bloque_grade_cols[bk]
+            s_bd = bloque_secciones[bk]
+
+            for s in s_bd:
+                doc_id = s.get('docente_id')
+                if doc_id is None:
+                    continue
+                letra = s.get('letra', '')
+                col_idx = None
+                if cfg['section_prefix'] == 'GRUPO':
+                    try:
+                        idx = int(letra) - 1 if letra.isdigit() else 0
+                    except (ValueError, TypeError):
+                        idx = 0
+                    col_idx = grade_start + min(idx, grade_end - grade_start)
+                else:
+                    if letra in letras:
+                        idx = letras.index(letra)
+                        col_idx = grade_start + idx
+                    elif letra:
+                        try:
+                            idx = ord(letra.upper()) - ord('A')
+                            col_idx = grade_start + min(idx, grade_end - grade_start)
+                        except (ValueError, TypeError):
+                            continue
+                if col_idx is not None:
+                    if doc_id not in docente_seccion_map:
+                        docente_seccion_map[doc_id] = {}
+                    docente_seccion_map[doc_id][bk] = col_idx
+
+        for idx, emp in enumerate(empleados, start=1):
+            row = data_start_row + idx - 1
+            ws.row_dimensions[row].height = 40
+
+            cedula = str(emp.get('cedula', '')).strip()
+            if cedula.startswith(('V-', 'E-', 'J-', 'G-')):
+                cedula = cedula[2:]
+            cedula = cedula.replace('.', '').replace('-', '')
+
+            nombres = str(emp.get('nombres', '')).strip().upper()
+            apellidos = str(emp.get('apellidos', '')).strip().upper()
+            nombre_completo = f"{nombres} {apellidos}".strip()
+
+            horas_acad = emp.get('horas_acad')
+            horas_adm = emp.get('horas_adm')
+            if horas_acad and horas_adm:
+                carga_horaria = horas_acad + horas_adm
+            elif horas_acad:
+                carga_horaria = horas_acad
+            elif horas_adm:
+                carga_horaria = horas_adm
+            else:
+                carga_horaria = ''
+
+            ws.cell(row=row, column=1, value=idx).font = font_data
+            ws.cell(row=row, column=1).alignment = align_center
+            ws.cell(row=row, column=1).border = border_data_first_last
+
+            ws.cell(row=row, column=2, value=cedula).font = font_data
+            ws.cell(row=row, column=2).alignment = align_center
+            ws.cell(row=row, column=2).border = border_data_full
+
+            ws.cell(row=row, column=3, value=nombre_completo).font = font_data
+            ws.cell(row=row, column=3).alignment = align_left
+            ws.cell(row=row, column=3).border = border_data_right
+
+            ws.cell(row=row, column=4, value=carga_horaria).font = font_data
+            ws.cell(row=row, column=4).alignment = align_center
+            ws.cell(row=row, column=4).border = border_data_all_thin
+
+            ws.cell(row=row, column=5, value="T").font = font_data
+            ws.cell(row=row, column=5).alignment = align_center
+            ws.cell(row=row, column=5).border = border_data_all_thin
+
+            ws.cell(row=row, column=6, value="I").font = font_data
+            ws.cell(row=row, column=6).alignment = align_center
+            ws.cell(row=row, column=6).border = border_data_all_thin
+
+            tipo = str(emp.get('tipo_personal', '')).strip()
+            ws.cell(row=row, column=7, value=tipo).font = font_data
+            ws.cell(row=row, column=7).alignment = align_center
+            ws.cell(row=row, column=7).border = border_data_right
+
+            # Mark the employee's assigned section with an X or leave matrícula blank
+            emp_id = emp.get('id')
+            emp_sections = docente_seccion_map.get(emp_id, {})
+            for bk in BLOCK_ORDER:
+                grade_start, grade_end = bloque_grade_cols[bk]
+                for c in range(grade_start, grade_end + 1):
+                    cell = ws.cell(row=row, column=c)
+                    cell.border = border_data_all_thin
+                    cell.font = font_data
+                    cell.alignment = align_center
+
+                if bloque_sec_cols[bk] is not None:
+                    sec_start, sec_end = bloque_sec_cols[bk]
+                    for c in range(sec_start, sec_end + 1):
+                        cell = ws.cell(row=row, column=c)
+                        cell.border = border_data_all_thin
+                        cell.font = font_data
+                        cell.alignment = align_center
+
+                if bk in emp_sections:
+                    target_col = emp_sections[bk]
+                    ws.cell(row=row, column=target_col).value = "X"
+                    ws.cell(row=row, column=target_col).font = font_data_bold
+
+            # Light fill for data rows
+            for c in range(1, last_data_col + 1):
+                ws.cell(row=row, column=c).fill = light_fill
+
+        wb.save(archivo)
+
+        crear_msgbox(
+            parent, "Exportación exitosa",
+            f"Cuadratura generada correctamente.\n\n"
+            f"Total de empleados: {len(empleados)}\n"
+            f"Archivo: {os.path.basename(archivo)}",
+            QMessageBox.Icon.Information
+        ).exec()
+
+        return archivo
+
+    except Exception as e:
+        crear_msgbox(
+            parent, "Error",
+            f"Error al generar cuadratura:\n{str(e)}",
             QMessageBox.Icon.Critical
         ).exec()
         return None

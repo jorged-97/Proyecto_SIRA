@@ -12,7 +12,7 @@ from models.secciones_model import SeccionesModel
 from utils.db import get_connection
 from utils.widgets import Switch
 from utils.exportar import (
-    generar_constancia_estudios, generar_buena_conducta,
+    generar_constancia_estudios, generar_constancia_estudios_docx, generar_buena_conducta,
     generar_constancia_inscripcion, generar_constancia_prosecucion_inicial,
     generar_constancia_retiro, generar_historial_estudiante_pdf,
     generar_historial_notas_pdf, generar_certificado_promocion_sexto
@@ -110,7 +110,8 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
         menu_exportar_estu = QMenu(self.btnExportar_ficha_estu)
         
         # Agregar opciones de exportación
-        menu_exportar_estu.addAction("Constancia de estudios", self.exportar_constancia_estudios)
+        menu_exportar_estu.addAction("Constancia de estudios (PDF)", self.exportar_constancia_estudios)
+        menu_exportar_estu.addAction("Constancia de estudios (DOCX)", self.exportar_constancia_estudios_docx)
         menu_exportar_estu.addAction("Constancia de buena conducta", self.exportar_buena_conducta)
         menu_exportar_estu.addAction("Constancia de inscripción", self.exportar_constancia_inscripcion)
         menu_exportar_estu.addAction("Constancia prosecución Educación Inicial", 
@@ -153,6 +154,17 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
             abrir_archivo(archivo)
         except Exception as e:
             crear_msgbox(self, "Error", f"No se pudo generar:\n{e}", QMessageBox.Icon.Critical).exec()
+
+    def exportar_constancia_estudios_docx(self):
+        """Genera constancia de estudios en formato DOCX."""
+        try:
+            estudiante = self.obtener_estudiante_actual_dict()
+            institucion = InstitucionModel.obtener_por_id(1)
+            archivo = generar_constancia_estudios_docx(estudiante, institucion)
+            crear_msgbox(self, "Éxito", f"Constancia (DOCX) generada:\n{archivo}", QMessageBox.Icon.Information).exec()
+            abrir_archivo(archivo)
+        except Exception as e:
+            crear_msgbox(self, "Error", f"No se pudo generar (DOCX):\n{e}", QMessageBox.Icon.Critical).exec()
 
     def exportar_constancia_inscripcion(self):
         """Genera constancia de inscripción."""

@@ -8,7 +8,7 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from models.dashboard_model import DashboardModel
 from models.institucion_model import InstitucionModel
 from utils.exportar import (
-    generar_constancia_estudios, generar_buena_conducta,
+    generar_constancia_estudios, generar_constancia_estudios_docx, generar_buena_conducta,
     exportar_tabla_excel, exportar_estudiantes_excel, generar_constancia_inscripcion,
     generar_constancia_prosecucion_inicial, generar_certificado_promocion_sexto)
 from utils.sombras import crear_sombra_flotante
@@ -107,7 +107,8 @@ class GestionEstudiantesPage(QWidget):
         self.btnExportar_estu.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         menu_exportar_estu = QMenu(self.btnExportar_estu)
         # Agregar opciones de exportación
-        #menu_exportar_estu.addAction("Constancia de estudios", self.exportar_constancia_estudios)
+        #menu_exportar_estu.addAction("Constancia de estudios (PDF)", self.exportar_constancia_estudios)
+        #menu_exportar_estu.addAction("Constancia de estudios (DOCX)", self.exportar_constancia_estudios_docx)
         #menu_exportar_estu.addAction("Constancia de buena conducta", self.exportar_buena_conducta)
         #menu_exportar_estu.addAction("Constancia de inscripción", self.exportar_constancia_inscripcion)
         #menu_exportar_estu.addSeparator()
@@ -423,27 +424,52 @@ class GestionEstudiantesPage(QWidget):
             return
 
         try:
-            # Obtener datos de la institución
             institucion = InstitucionModel.obtener_por_id(1)
-            
-            # Generar la constancia
             archivo = generar_constancia_estudios(estudiante, institucion)
-            
             crear_msgbox(
                 self,
                 "Éxito",
                 f"Constancia de estudios generada correctamente:\n{archivo}",
                 QMessageBox.Icon.Information
             ).exec()
-            
-            # Abrir el archivo
             abrir_archivo(archivo)
-            
+
         except Exception as e:
             crear_msgbox(
                 self,
                 "Error",
                 f"No se pudo generar constancia de estudios:\n{e}",
+                QMessageBox.Icon.Critical
+            ).exec()
+
+    def exportar_constancia_estudios_docx(self):
+        """Genera constancia de estudios en DOCX del estudiante seleccionado"""
+        estudiante = self.obtener_estudiante_seleccionado()
+        if not estudiante:
+            crear_msgbox(
+                self,
+                "Selección requerida",
+                "Debe seleccionar un estudiante de la tabla.",
+                QMessageBox.Icon.Warning
+            ).exec()
+            return
+
+        try:
+            institucion = InstitucionModel.obtener_por_id(1)
+            archivo = generar_constancia_estudios_docx(estudiante, institucion)
+            crear_msgbox(
+                self,
+                "Éxito",
+                f"Constancia de estudios (DOCX) generada correctamente:\n{archivo}",
+                QMessageBox.Icon.Information
+            ).exec()
+            abrir_archivo(archivo)
+
+        except Exception as e:
+            crear_msgbox(
+                self,
+                "Error",
+                f"No se pudo generar constancia de estudios (DOCX):\n{e}",
                 QMessageBox.Icon.Critical
             ).exec()
 
