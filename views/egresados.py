@@ -5,9 +5,10 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from models.estu_model import EstudianteModel
 from models.institucion_model import InstitucionModel
 from utils.exportar import (
-    generar_buena_conducta, 
-    exportar_tabla_excel, 
-    generar_certificado_promocion_sexto
+    generar_buena_conducta,
+    exportar_tabla_excel,
+    generar_certificado_promocion_sexto,
+    generar_certificado_promocion_sexto_docx
 )
 from utils.sombras import crear_sombra_flotante
 from utils.logo_manager import aplicar_logo_a_label
@@ -72,6 +73,7 @@ class Egresados(QWidget):
         menu_exportar = QMenu(self.btnExportar_egresados)
         menu_exportar.addAction("Constancia de buena conducta", self.exportar_buena_conducta)
         menu_exportar.addAction("Certificado promoción 6to a Secundaria", self.exportar_certificado_promocion_sexto)
+        menu_exportar.addAction("Certificado promoción 6to a Secundaria (DOCX)", self.exportar_certificado_promocion_sexto_docx)
         menu_exportar.addAction("Exportar tabla filtrada a Excel", self.exportar_excel_egresados)
         self.btnExportar_egresados.setMenu(menu_exportar)
         
@@ -500,5 +502,94 @@ class Egresados(QWidget):
                 self,
                 "Error",
                 f"No se pudo generar el certificado: {e}",
+                QMessageBox.Icon.Critical
+            ).exec()
+
+    def exportar_certificado_promocion_sexto_docx(self):
+        """Genera certificado de promoción de 6to grado en formato DOCX."""
+        estudiante = self.obtener_estudiante_seleccionado()
+
+        if not estudiante:
+            crear_msgbox(
+                self,
+                "Selección requerida",
+                "Debe seleccionar un estudiante de la tabla.",
+                QMessageBox.Icon.Warning
+            ).exec()
+            return
+
+        try:
+            if estudiante.get("estatus_academico") != "Egresado":
+                crear_msgbox(
+                    self,
+                    "No elegible",
+                    "El estudiante seleccionado no está marcado como egresado.",
+                    QMessageBox.Icon.Warning
+                ).exec()
+                return
+
+            id_estudiante = estudiante['id']
+            historial = EstudianteModel.obtener_historial_estudiante(id_estudiante)
+
+            if not historial:
+                crear_msgbox(
+                    self,
+                    "Sin historial",
+                    "No se encontró historial académico para este estudiante.",
+                    QMessageBox.Icon.Warning
+                ).exec()
+                return
+
+            curso_sexto = None
+            for registro in historial:
+                grado = registro['grado'].lower().strip()
+                nivel = registro['nivel'].lower().strip()
+                if 'primaria' in nivel and '6' in grado:
+                    curso_sexto = registro
+                    break
+
+            if not curso_sexto:
+                crear_msgbox(
+                    self,
+                    "No elegible",
+                    "Este estudiante no cursó 6to grado en esta institución.\n\n"
+                    "Este certificado solo puede generarse para estudiantes que "
+                    "completaron 6to grado de primaria en esta institución.",
+                    QMessageBox.Icon.Warning
+                ).exec()
+                return
+
+            estudiante['ultima_seccion'] = curso_sexto['letra']
+            institucion = InstitucionModel.obtener_por_id(1)
+
+            if not institucion:
+                crear_msgbox(
+                    self,
+                    "Error",
+                    "No se encontraron datos de la institución.",
+                    QMessageBox.Icon.Critical
+                ).exec()
+                return
+
+            archivo = generar_certificado_promocion_sexto_docx(
+                estudiante,
+                institucion,
+                curso_sexto['año_escolar']
+            )
+
+            crear_msgbox(
+                self,
+                "Éxito",
+                f"Certificado DOCX generado exitosamente:\n{archivo}",
+                QMessageBox.Icon.Information
+            ).exec()
+
+            abrir_archivo(archivo)
+
+        except Exception as e:
+            crear_msgbox(
+                self,
+                "Error",
+                f"No se pudo generar el certificado DOCX: {e}",
                 QMessageBox.Icon.Critical
             ).exec()

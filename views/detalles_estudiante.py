@@ -15,7 +15,8 @@ from utils.exportar import (
     generar_constancia_estudios, generar_constancia_estudios_docx, generar_buena_conducta,
     generar_constancia_inscripcion, generar_constancia_prosecucion_inicial,
     generar_constancia_retiro, generar_historial_estudiante_pdf,
-    generar_historial_notas_pdf, generar_certificado_promocion_sexto
+    generar_historial_notas_pdf, generar_certificado_promocion_sexto,
+    generar_certificado_promocion_sexto_docx
 )
 from utils.sombras import crear_sombra_flotante
 from utils.logo_manager import aplicar_logo_a_label
@@ -117,7 +118,9 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
         menu_exportar_estu.addAction("Constancia prosecución Educación Inicial", 
                                      self.exportar_constancia_prosecucion_inicial)
         menu_exportar_estu.addAction("Certificado promoción 6to a Secundaria",
-                         self.exportar_certificado_promocion_sexto)
+                                      self.exportar_certificado_promocion_sexto)
+        menu_exportar_estu.addAction("Certificado promoción 6to a Secundaria (DOCX)",
+                                      self.exportar_certificado_promocion_sexto_docx)
         menu_exportar_estu.addAction("Constancia de retiro", self.exportar_constancia_retiro)
         menu_exportar_estu.addSeparator()
         menu_exportar_estu.addAction("Exportar historial académico (PDF)", self.exportar_historial_pdf)
@@ -320,7 +323,71 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
             abrir_archivo(archivo)
         except Exception as e:
             crear_msgbox(self, "Error", f"No se pudo generar:\n{e}", QMessageBox.Icon.Critical).exec()
-    
+
+    def exportar_certificado_promocion_sexto_docx(self):
+        """Genera certificado de promoción de 6to en formato DOCX."""
+        try:
+            anio_escolar_certificado = None
+            ultima_seccion = None
+
+            if self.es_egresado:
+                historial = EstudianteModel.obtener_historial_estudiante(self.id_estudiante)
+                if not historial:
+                    crear_msgbox(self, "Sin historial", "No hay historial.", QMessageBox.Icon.Warning).exec()
+                    return
+
+                curso_sexto = next(
+                    (
+                        r for r in historial
+                        if 'primaria' in str(r.get('nivel', '')).lower()
+                        and '6' in str(r.get('grado', '')).lower()
+                    ),
+                    None
+                )
+
+                if not curso_sexto:
+                    crear_msgbox(
+                        self,
+                        "No elegible",
+                        "Este estudiante no cursó 6to grado en esta institución.",
+                        QMessageBox.Icon.Warning
+                    ).exec()
+                    return
+
+                anio_escolar_certificado = curso_sexto['año_escolar']
+                ultima_seccion = curso_sexto.get('letra')
+            else:
+                tipo_actual = self.cbxTipoEdu_ficha_estu.currentText().strip().lower()
+                grado_actual = self.cbxGrado_ficha_estu.currentText().strip().lower()
+
+                if tipo_actual != 'primaria' or '6' not in grado_actual:
+                    crear_msgbox(
+                        self,
+                        "Estudiante no elegible",
+                        "Este certificado solo se puede generar para estudiantes cursando 6to grado o egresados.",
+                        QMessageBox.Icon.Warning
+                    ).exec()
+                    return
+
+                anio_inicio = int(self.anio_escolar['año_inicio'])
+                anio_escolar_certificado = f"{anio_inicio}/{anio_inicio + 1}"
+                ultima_seccion = self.cbxSeccion_ficha_estu.currentText().split(" (")[0].strip()
+
+            estudiante = self.obtener_estudiante_actual_dict()
+            estudiante['ultima_seccion'] = ultima_seccion or 'N/A'
+
+            institucion = InstitucionModel.obtener_por_id(1)
+            archivo = generar_certificado_promocion_sexto_docx(
+                estudiante,
+                institucion,
+                anio_escolar_certificado
+            )
+
+            crear_msgbox(self, "Éxito", f"Certificado DOCX generado:\n{archivo}", QMessageBox.Icon.Information).exec()
+            abrir_archivo(archivo)
+        except Exception as e:
+            crear_msgbox(self, "Error", f"No se pudo generar:\n{e}", QMessageBox.Icon.Critical).exec()
+
     def exportar_constancia_retiro(self):
         """Genera constancia de retiro."""
         # Verificar si el estudiante está inactivo

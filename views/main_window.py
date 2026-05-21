@@ -17,7 +17,8 @@ from utils.exportar import (
     generar_constancia_inscripcion, generar_constancia_prosecucion_inicial,
     generar_constancia_trabajo, generar_constancia_retiro,
     generar_historial_estudiante_pdf, generar_historial_notas_pdf,
-    generar_certificado_promocion_sexto
+    generar_certificado_promocion_sexto,
+    generar_certificado_promocion_sexto_docx
 )
 from utils.backup import BackupManager
 from models.estu_model import EstudianteModel
@@ -292,6 +293,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             "Constancia de buena conducta",
             "Constancia de prosecución inicial",
             "Certificado promoción 6to a Secundaria",
+            "Certificado promoción 6to a Secundaria (DOCX)",
             "Constancia de retiro",
             "Historial académico",
             "Historial de notas",
@@ -1155,45 +1157,66 @@ class MainWindow(QMainWindow, UiMainWindowBase):
                         ).exec()
                         return
 
-                    archivo = generar_constancia_prosecucion_inicial(estudiante, institucion, anio_escolar_inicial)
+                archivo = generar_constancia_prosecucion_inicial(estudiante, institucion, anio_escolar_inicial)
 
-                elif constancia == "Certificado promoción 6to a Secundaria":
-                    tipo_actual = str(datos_bd.get("tipo_educacion", "")).strip().lower()
-                    grado_actual = str(datos_bd.get("grado", "")).strip().lower()
+            elif constancia == "Certificado promoción 6to a Secundaria":
+                tipo_actual = str(datos_bd.get("tipo_educacion", "")).strip().lower()
+                grado_actual = str(datos_bd.get("grado", "")).strip().lower()
 
-                    if tipo_actual != 'primaria' or '6' not in grado_actual:
-                        crear_msgbox(
-                            self,
-                            "Estudiante no elegible",
-                            "Este certificado solo se puede generar para estudiantes que cursan 6to grado.",
-                            QMessageBox.Icon.Warning
-                        ).exec()
-                        return
+                if tipo_actual != 'primaria' or '6' not in grado_actual:
+                    crear_msgbox(
+                        self,
+                        "Estudiante no elegible",
+                        "Este certificado solo se puede generar para estudiantes que cursan 6to grado.",
+                        QMessageBox.Icon.Warning
+                    ).exec()
+                    return
 
-                    anio_inicio = int(self.anio_escolar['año_inicio'])
-                    estudiante['ultima_seccion'] = estudiante.get('Sección', 'N/A')
-                    archivo = generar_certificado_promocion_sexto(
-                        estudiante,
-                        institucion,
-                        f"{anio_inicio}/{anio_inicio + 1}"
-                    )
+                anio_inicio = int(self.anio_escolar['año_inicio'])
+                estudiante['ultima_seccion'] = estudiante.get('Sección', 'N/A')
+                archivo = generar_certificado_promocion_sexto(
+                    estudiante,
+                    institucion,
+                    f"{anio_inicio}/{anio_inicio + 1}"
+                )
 
-                elif constancia == "Constancia de retiro":
-                    if datos_bd.get("estado", 1) == 1:
-                        crear_msgbox(self, "Estudiante activo",
-                            "La constancia de retiro solo se puede generar para estudiantes retirados (inactivos).",
-                            QMessageBox.Icon.Warning).exec()
-                        return
-                    motivo_retiro = datos_bd.get("motivo_retiro")
-                    archivo = generar_constancia_retiro(estudiante, institucion, self.anio_escolar, motivo_retiro)
+            elif constancia == "Certificado promoción 6to a Secundaria (DOCX)":
+                tipo_actual = str(datos_bd.get("tipo_educacion", "")).strip().lower()
+                grado_actual = str(datos_bd.get("grado", "")).strip().lower()
 
-                elif constancia == "Historial académico":
-                    historial = EstudianteModel.obtener_historial_estudiante(persona_id)
-                    archivo = generar_historial_estudiante_pdf(estudiante, historial)
+                if tipo_actual != 'primaria' or '6' not in grado_actual:
+                    crear_msgbox(
+                        self,
+                        "Estudiante no elegible",
+                        "Este certificado solo se puede generar para estudiantes que cursan 6to grado.",
+                        QMessageBox.Icon.Warning
+                    ).exec()
+                    return
 
-                elif constancia == "Historial de notas":
-                    notas = NotasModel.obtener_notas_estudiante(persona_id)
-                    archivo = generar_historial_notas_pdf(estudiante, notas)
+                anio_inicio = int(self.anio_escolar['año_inicio'])
+                estudiante['ultima_seccion'] = estudiante.get('Sección', 'N/A')
+                archivo = generar_certificado_promocion_sexto_docx(
+                    estudiante,
+                    institucion,
+                    f"{anio_inicio}/{anio_inicio + 1}"
+                )
+
+            elif constancia == "Constancia de retiro":
+                if datos_bd.get("estado", 1) == 1:
+                    crear_msgbox(self, "Estudiante activo",
+                                 "La constancia de retiro solo se puede generar para estudiantes retirados (inactivos).",
+                                 QMessageBox.Icon.Warning).exec()
+                    return
+                motivo_retiro = datos_bd.get("motivo_retiro")
+                archivo = generar_constancia_retiro(estudiante, institucion, self.anio_escolar, motivo_retiro)
+
+            elif constancia == "Historial académico":
+                historial = EstudianteModel.obtener_historial_estudiante(persona_id)
+                archivo = generar_historial_estudiante_pdf(estudiante, historial)
+
+            elif constancia == "Historial de notas":
+                notas = NotasModel.obtener_notas_estudiante(persona_id)
+                archivo = generar_historial_notas_pdf(estudiante, notas)
 
             elif poblacion == "Empleados":
                 datos_bd = EmpleadoModel.obtener_por_id(persona_id)
