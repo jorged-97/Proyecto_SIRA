@@ -39,13 +39,13 @@ justificado = ParagraphStyle(
     name="Justificado",
     parent=styles["Normal"],
     alignment=TA_JUSTIFY,
-    leading=16
+    leading=18
 )
 centrado = ParagraphStyle(
     name="Centrado",
     parent=styles["Normal"],
     alignment=TA_CENTER,
-    leading=16
+    leading=18
 )
 
 page_width, page_height = letter
@@ -433,7 +433,7 @@ def generar_constancia_estudios(estudiante: dict, institucion: dict) -> str:
         
         texto_fecha = f"Certificado que se expide en <b>PUERTO LA CRUZ</b>, a los <b>{dia}</b> días del mes de <b>{mes_es}</b> de <b>{anio}</b>"
         story.append(Paragraph(texto_fecha, justificado))
-        story.append(Spacer(1, 100))
+        story.append(Spacer(1, 150))
 
         # Firma
         firma = f"________________________<br/>Prof. {institucion['director']}"
@@ -1005,7 +1005,7 @@ def generar_buena_conducta(estudiante: dict, institucion: dict, anio_escolar: di
             pagesize=letter,
             leftMargin=80,
             rightMargin=80,
-            topMargin=180,
+            topMargin=220,
             bottomMargin=50
         )
 
@@ -1040,7 +1040,7 @@ def generar_buena_conducta(estudiante: dict, institucion: dict, anio_escolar: di
         
         texto_fecha = f"Certificado que se expide en <b>PUERTO LA CRUZ</b>, a los <b>{dia}</b> días del mes de <b>{mes_es}</b> de <b>{anio}</b>"
         story.append(Paragraph(texto_fecha, justificado))
-        story.append(Spacer(1, 100))
+        story.append(Spacer(1, 150))
 
         # Firma
         firma = f"________________________<br/>Prof. {institucion['director']}"
@@ -1109,7 +1109,7 @@ def generar_constancia_inscripcion(estudiante: dict, institucion: dict) -> str:
             pagesize=letter,
             leftMargin=80,
             rightMargin=80,
-            topMargin=180,
+            topMargin=220,
             bottomMargin=50
         )
 
@@ -1141,7 +1141,7 @@ def generar_constancia_inscripcion(estudiante: dict, institucion: dict) -> str:
         
         texto_fecha = f"Certificado que se expide en <b>PUERTO LA CRUZ</b>, a los <b>{dia}</b> días del mes de <b>{mes_es}</b> de <b>{anio}</b>"
         story.append(Paragraph(texto_fecha, justificado))
-        story.append(Spacer(1, 100))
+        story.append(Spacer(1, 150))
 
         # Firma
         director_ci = normalizar_cedula(institucion['director_ci'])
@@ -1329,7 +1329,7 @@ def generar_constancia_trabajo(empleado: dict, institucion: dict) -> str:
             pagesize=letter,
             leftMargin=80,
             rightMargin=80,
-            topMargin=180,
+            topMargin=220,
             bottomMargin=50
         )
 
@@ -1362,7 +1362,7 @@ def generar_constancia_trabajo(empleado: dict, institucion: dict) -> str:
         
         texto_fecha = f"Certificado que se expide a petición de la parte interesada, en <b>PUERTO LA CRUZ</b>, a los <b>{dia}</b> días del mes de <b>{mes_es}</b> de <b>{anio}</b>"
         story.append(Paragraph(texto_fecha, justificado))
-        story.append(Spacer(1, 100))
+        story.append(Spacer(1, 150))
 
         # Firma
         firma = f"________________________<br/>Prof. {institucion['director']}"
@@ -1979,7 +1979,7 @@ def generar_constancia_retiro(estudiante: dict, institucion: dict, anio_escolar:
             pagesize=letter,
             leftMargin=80,
             rightMargin=80,
-            topMargin=180,
+            topMargin=220,
             bottomMargin=50
         )
 
@@ -2029,7 +2029,7 @@ def generar_constancia_retiro(estudiante: dict, institucion: dict, anio_escolar:
             f"a los <b>{dia}</b> días del mes de <b>{mes_es}</b> del año <b>{anio}</b>."
         )
         story.append(Paragraph(texto_fecha, justificado))
-        story.append(Spacer(1, 100))
+        story.append(Spacer(1, 150))
 
         # Firma
         firma_texto = f"________________________<br/>Prof. {institucion['director']}"
