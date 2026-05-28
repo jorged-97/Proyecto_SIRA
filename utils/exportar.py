@@ -3122,9 +3122,8 @@ def generar_cuadratura_excel(parent) -> str:
 
             horas_acad = emp.get('horas_acad')
             horas_adm = emp.get('horas_adm')
-            if horas_acad and horas_adm:
-                carga_horaria = horas_acad + horas_adm
-            elif horas_acad:
+
+            if horas_acad:
                 carga_horaria = horas_acad
             elif horas_adm:
                 carga_horaria = horas_adm

@@ -1157,7 +1157,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
                         ).exec()
                         return
 
-                archivo = generar_constancia_prosecucion_inicial(estudiante, institucion, anio_escolar_inicial)
+                    archivo = generar_constancia_prosecucion_inicial(estudiante, institucion, anio_escolar_inicial)
 
             elif constancia == "Certificado promoción 6to a Secundaria":
                 tipo_actual = str(datos_bd.get("tipo_educacion", "")).strip().lower()
