@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'main.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.8.2
+## Created by: Qt User Interface Compiler version 6.11.0
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -1252,9 +1252,9 @@ class Ui_MainWindow(object):
         self.estadisticas.setObjectName(u"estadisticas")
         self.frameCriterio = QFrame(self.estadisticas)
         self.frameCriterio.setObjectName(u"frameCriterio")
-        self.frameCriterio.setGeometry(QRect(420, 50, 230, 40))
-        self.frameCriterio.setMinimumSize(QSize(230, 40))
-        self.frameCriterio.setMaximumSize(QSize(230, 40))
+        self.frameCriterio.setGeometry(QRect(420, 50, 281, 40))
+        self.frameCriterio.setMinimumSize(QSize(281, 40))
+        self.frameCriterio.setMaximumSize(QSize(281, 40))
         self.frameCriterio.setStyleSheet(u"QFrame{\n"
 "	background-color: white;\n"
 "	border: 1.5px solid #2980b9;\n"
@@ -1271,9 +1271,9 @@ class Ui_MainWindow(object):
         self.frameCriterio.setFrameShadow(QFrame.Shadow.Raised)
         self.cbxCriterio = QComboBox(self.frameCriterio)
         self.cbxCriterio.setObjectName(u"cbxCriterio")
-        self.cbxCriterio.setGeometry(QRect(6, 5, 218, 30))
-        self.cbxCriterio.setMinimumSize(QSize(210, 30))
-        self.cbxCriterio.setMaximumSize(QSize(250, 30))
+        self.cbxCriterio.setGeometry(QRect(6, 5, 271, 30))
+        self.cbxCriterio.setMinimumSize(QSize(271, 30))
+        self.cbxCriterio.setMaximumSize(QSize(271, 30))
         font9 = QFont()
         font9.setFamilies([u"Segoe UI"])
         font9.setPointSize(11)
@@ -1328,9 +1328,9 @@ class Ui_MainWindow(object):
         self.cbxCriterio.setIconSize(QSize(10, 10))
         self.frameTipoGrafica = QFrame(self.estadisticas)
         self.frameTipoGrafica.setObjectName(u"frameTipoGrafica")
-        self.frameTipoGrafica.setGeometry(QRect(670, 50, 230, 40))
-        self.frameTipoGrafica.setMinimumSize(QSize(230, 40))
-        self.frameTipoGrafica.setMaximumSize(QSize(230, 40))
+        self.frameTipoGrafica.setGeometry(QRect(719, 50, 181, 40))
+        self.frameTipoGrafica.setMinimumSize(QSize(181, 40))
+        self.frameTipoGrafica.setMaximumSize(QSize(181, 40))
         self.frameTipoGrafica.setStyleSheet(u"QFrame{\n"
 "	background-color: white;\n"
 "	border: 1.5px solid #2980b9;\n"
@@ -1347,9 +1347,9 @@ class Ui_MainWindow(object):
         self.frameTipoGrafica.setFrameShadow(QFrame.Shadow.Raised)
         self.cbxTipoGrafica = QComboBox(self.frameTipoGrafica)
         self.cbxTipoGrafica.setObjectName(u"cbxTipoGrafica")
-        self.cbxTipoGrafica.setGeometry(QRect(11, 5, 210, 30))
-        self.cbxTipoGrafica.setMinimumSize(QSize(210, 30))
-        self.cbxTipoGrafica.setMaximumSize(QSize(210, 30))
+        self.cbxTipoGrafica.setGeometry(QRect(10, 5, 161, 30))
+        self.cbxTipoGrafica.setMinimumSize(QSize(161, 30))
+        self.cbxTipoGrafica.setMaximumSize(QSize(161, 30))
         self.cbxTipoGrafica.setFont(font9)
         self.cbxTipoGrafica.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.cbxTipoGrafica.setStyleSheet(u"QComboBox {\n"
@@ -1559,14 +1559,14 @@ class Ui_MainWindow(object):
         self.lblMin_2.setWordWrap(True)
         self.lblCriterio = QLabel(self.estadisticas)
         self.lblCriterio.setObjectName(u"lblCriterio")
-        self.lblCriterio.setGeometry(QRect(430, 10, 211, 31))
+        self.lblCriterio.setGeometry(QRect(460, 10, 211, 31))
         self.lblCriterio.setFont(font)
         self.lblCriterio.setStyleSheet(u"")
         self.lblCriterio.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lblCriterio.setWordWrap(True)
         self.lblMin_4 = QLabel(self.estadisticas)
         self.lblMin_4.setObjectName(u"lblMin_4")
-        self.lblMin_4.setGeometry(QRect(720, 10, 121, 31))
+        self.lblMin_4.setGeometry(QRect(750, 10, 121, 31))
         self.lblMin_4.setFont(font)
         self.lblMin_4.setStyleSheet(u"")
         self.lblMin_4.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -2772,7 +2772,7 @@ class Ui_MainWindow(object):
         self.retranslateUi(MainWindow)
 
         self.stackBarra_lateral.setCurrentIndex(1)
-        self.stackMain.setCurrentIndex(0)
+        self.stackMain.setCurrentIndex(5)
         self.stackedReportes.setCurrentIndex(0)
 
 

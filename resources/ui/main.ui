@@ -1900,7 +1900,7 @@ QPushButton:checked {
 color: #2d2d2d;</string>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>5</number>
      </property>
      <widget class="QWidget" name="home">
       <widget class="QFrame" name="frameSaludo">
@@ -3155,19 +3155,19 @@ background-color: transparent;</string>
         <rect>
          <x>420</x>
          <y>50</y>
-         <width>230</width>
+         <width>281</width>
          <height>40</height>
         </rect>
        </property>
        <property name="minimumSize">
         <size>
-         <width>230</width>
+         <width>281</width>
          <height>40</height>
         </size>
        </property>
        <property name="maximumSize">
         <size>
-         <width>230</width>
+         <width>281</width>
          <height>40</height>
         </size>
        </property>
@@ -3196,19 +3196,19 @@ QComboBox QAbstractItemView {
          <rect>
           <x>6</x>
           <y>5</y>
-          <width>218</width>
+          <width>271</width>
           <height>30</height>
          </rect>
         </property>
         <property name="minimumSize">
          <size>
-          <width>210</width>
+          <width>271</width>
           <height>30</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>250</width>
+          <width>271</width>
           <height>30</height>
          </size>
         </property>
@@ -3279,21 +3279,21 @@ QComboBox QAbstractItemView {
       <widget class="QFrame" name="frameTipoGrafica">
        <property name="geometry">
         <rect>
-         <x>670</x>
+         <x>719</x>
          <y>50</y>
-         <width>230</width>
+         <width>181</width>
          <height>40</height>
         </rect>
        </property>
        <property name="minimumSize">
         <size>
-         <width>230</width>
+         <width>181</width>
          <height>40</height>
         </size>
        </property>
        <property name="maximumSize">
         <size>
-         <width>230</width>
+         <width>181</width>
          <height>40</height>
         </size>
        </property>
@@ -3320,21 +3320,21 @@ QComboBox QAbstractItemView {
        <widget class="QComboBox" name="cbxTipoGrafica">
         <property name="geometry">
          <rect>
-          <x>11</x>
+          <x>10</x>
           <y>5</y>
-          <width>210</width>
+          <width>161</width>
           <height>30</height>
          </rect>
         </property>
         <property name="minimumSize">
          <size>
-          <width>210</width>
+          <width>161</width>
           <height>30</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>210</width>
+          <width>161</width>
           <height>30</height>
          </size>
         </property>
@@ -3808,7 +3808,7 @@ background-color: transparent;</string>
       <widget class="QLabel" name="lblCriterio">
        <property name="geometry">
         <rect>
-         <x>430</x>
+         <x>460</x>
          <y>10</y>
          <width>211</width>
          <height>31</height>
@@ -3837,7 +3837,7 @@ background-color: transparent;</string>
       <widget class="QLabel" name="lblMin_4">
        <property name="geometry">
         <rect>
-         <x>720</x>
+         <x>750</x>
          <y>10</y>
          <width>121</width>
          <height>31</height>
