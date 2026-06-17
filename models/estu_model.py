@@ -6,6 +6,14 @@ from models.secciones_model import SeccionesModel
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 
+MAPA_GRADOS = {
+    "1er": "2do",
+    "2do": "3er",
+    "3er": "4to",
+    "4to": "5to",
+    "5to": "6to",
+    "6to": "1er Año"
+}
 
 class EstudianteModel:
     """Modelo de estudiantes del sistema."""

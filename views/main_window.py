@@ -18,7 +18,7 @@ from utils.exportar import (
     generar_constancia_trabajo, generar_constancia_retiro,
     generar_historial_estudiante_pdf, generar_historial_notas_pdf,
     generar_certificado_promocion_sexto,
-    generar_certificado_promocion_sexto_docx
+    generar_certificado_promocion_sexto_docx, generar_certificado_prosecucion_primaria
 )
 from utils.backup import BackupManager
 from models.estu_model import EstudianteModel
@@ -292,8 +292,9 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             "Constancia de inscripción",
             "Constancia de buena conducta",
             "Constancia de prosecución inicial",
-            "Certificado promoción 6to a Secundaria",
-            "Certificado promoción 6to a Secundaria (DOCX)",
+            "Certif. de prosecución primaria",
+            "Certif. promoción 6to a Secundaria",
+            "Certif. promoción 6to a Secundaria (DOCX)",
             "Constancia de retiro",
             "Historial académico",
             "Historial de notas",
@@ -1107,6 +1108,9 @@ class MainWindow(QMainWindow, UiMainWindowBase):
 
                 elif constancia == "Constancia de buena conducta":
                     archivo = generar_buena_conducta(estudiante, institucion, self.anio_escolar)
+                
+                elif constancia == "Certif. de prosecución primaria":
+                    archivo = generar_certificado_prosecucion_primaria(estudiante, institucion, self.anio_escolar)
 
                 elif constancia == "Constancia de prosecución inicial":
                     tipo_actual = str(datos_bd.get("tipo_educacion", "")).strip().lower()
@@ -1159,7 +1163,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
 
                     archivo = generar_constancia_prosecucion_inicial(estudiante, institucion, anio_escolar_inicial)
 
-                elif constancia == "Certificado promoción 6to a Secundaria":
+                elif constancia == "Certif. promoción 6to a Secundaria":
                     tipo_actual = str(datos_bd.get("tipo_educacion", "")).strip().lower()
                     grado_actual = str(datos_bd.get("grado", "")).strip().lower()
 
@@ -1180,7 +1184,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
                         f"{anio_inicio}/{anio_inicio + 1}"
                     )
 
-                elif constancia == "Certificado promoción 6to a Secundaria (DOCX)":
+                elif constancia == "Certif. promoción 6to a Secundaria (DOCX)":
                     tipo_actual = str(datos_bd.get("tipo_educacion", "")).strip().lower()
                     grado_actual = str(datos_bd.get("grado", "")).strip().lower()
 
