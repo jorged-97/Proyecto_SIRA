@@ -21,7 +21,7 @@ class LoginDialog(QDialog, Ui_login):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("Inicio de sesión")
-        self.lblVersion.setText("Versión SIRA: v-1.1.8")
+        self.lblVersion.setText("Versión SIRA: v-1.1.9")
         crear_sombra_flotante(self.lblLogo_SIRA, blur_radius=8, y_offset=1)
         crear_sombra_flotante(self.lblLogo_escuela, blur_radius=8, y_offset=1)
         
