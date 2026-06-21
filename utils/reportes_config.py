@@ -1,12 +1,14 @@
 from utils.db import get_connection
 from matplotlib import cm
 from models.anio_model import AnioEscolarModel
+from models.colaboracion_model import ColaboracionModel
 
 criterios_por_poblacion = {
     "Estudiantes": ["Por género", "Rango de edad", "Por sección", "Por grado", "Por ciudad de nacimiento", "Matricula por año escolar"],
     "Egresados": ["Por género", "Por año escolar de egreso"],
     "Secciones": ["Distribución por género", "Distribución por edad promedio", "Ocupación por sección", "Género por sección específica"],
     "Empleados": ["Por cargo", "Por nivel académico"],
+    "Colaboración": ["Por año escolar", "Por sección", "Inscritos por año escolar", "Listado por sección"],
 }
 
 class CriteriosReportes:
@@ -558,6 +560,97 @@ class CriteriosReportes:
             if conn and conn.is_connected():
                 conn.close()
 
+    @staticmethod
+    def colaboracion_por_anio():
+        conn = get_connection()
+        if not conn:
+            return [], []
+        cursor = None
+        try:
+            cursor = conn.cursor()
+            anio_actual = AnioEscolarModel.obtener_actual()
+            if not anio_actual:
+                return [], []
+            cursor.execute(
+                """SELECT
+                      CASE WHEN colaboro_val = 1 THEN 'Colaboró' ELSE 'No colaboró' END AS estado,
+                      COUNT(*) AS total
+                   FROM (
+                       SELECT COALESCE(ci.colaboro, 0) AS colaboro_val
+                       FROM seccion_estudiante se
+                       JOIN secciones s ON se.seccion_id = s.id
+                       JOIN estudiantes e ON se.estudiante_id = e.id
+                       LEFT JOIN colaboracion_inscripcion ci ON ci.estudiante_id = e.id AND ci.anio_escolar_id = %s
+                       WHERE s.año_escolar_id = %s AND s.activo = 1 AND e.estado = 1
+                   ) sub
+                   GROUP BY colaboro_val""",
+                (anio_actual['id'], anio_actual['id'])
+            )
+            datos = cursor.fetchall()
+            etiquetas = [fila[0] for fila in datos]
+            valores = [fila[1] for fila in datos]
+            return etiquetas, valores
+        except Exception as e:
+            print(f"Error en colaboracion_por_anio: {e}")
+            return [], []
+        finally:
+            if cursor:
+                cursor.close()
+            if conn and conn.is_connected():
+                conn.close()
+
+    @staticmethod
+    def colaboracion_por_seccion():
+        anio_actual = AnioEscolarModel.obtener_actual()
+        if not anio_actual:
+            return [], []
+        datos = ColaboracionModel.obtener_estadisticas_por_seccion(anio_actual['id'])
+        if not datos:
+            return [], []
+        etiquetas = [f"{d['seccion']} (Sí)" for d in datos] + [f"{d['seccion']} (No)" for d in datos]
+        valores = [int(d['colaboraron'] or 0) for d in datos] + [int(d['no_colaboraron'] or 0) for d in datos]
+        etiquetas_f = []
+        valores_f = []
+        for e, v in zip(etiquetas, valores):
+            if v > 0:
+                etiquetas_f.append(e)
+                valores_f.append(v)
+        return etiquetas_f, valores_f
+
+    @staticmethod
+    def inscritos_por_anio_escolar():
+        conn = get_connection()
+        if not conn:
+            return [], []
+        cursor = None
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT
+                      CONCAT(a.año_inicio, '/', a.año_fin) AS año_escolar,
+                      COUNT(DISTINCT se.estudiante_id) AS total,
+                      SUM(CASE WHEN COALESCE(ci.colaboro, 0) = 1 THEN 1 ELSE 0 END) AS colaboraron
+                   FROM anio_escolar a
+                   LEFT JOIN secciones s ON s.año_escolar_id = a.id AND s.activo = 1
+                   LEFT JOIN seccion_estudiante se ON se.seccion_id = s.id
+                   LEFT JOIN estudiantes e ON se.estudiante_id = e.id AND e.estado = 1
+                   LEFT JOIN colaboracion_inscripcion ci ON ci.estudiante_id = e.id AND ci.anio_escolar_id = a.id
+                   GROUP BY a.id, a.año_inicio, a.año_fin
+                   ORDER BY a.año_inicio"""
+            )
+            datos = cursor.fetchall()
+            etiquetas = [fila[0] for fila in datos]
+            valores = [fila[1] for fila in datos]
+            return etiquetas, valores
+        except Exception as e:
+            print(f"Error en inscritos_por_anio_escolar: {e}")
+            return [], []
+        finally:
+            if cursor:
+                cursor.close()
+            if conn and conn.is_connected():
+                conn.close()
+
     # ============== MAPEO DE CONSULTAS ==============
     CONSULTAS = {
         # Estudiantes
@@ -581,6 +674,12 @@ class CriteriosReportes:
         # Empleados
         ("Empleados", "Por cargo"): (empleados_por_cargo.__func__, []),
         ("Empleados", "Por nivel académico"): (empleados_por_nivel_academico.__func__, []),
+
+        # Colaboración
+        ("Colaboración", "Por año escolar"): (colaboracion_por_anio.__func__, []),
+        ("Colaboración", "Por sección"): (colaboracion_por_seccion.__func__, []),
+        ("Colaboración", "Inscritos por año escolar"): (inscritos_por_anio_escolar.__func__, []),
+        ("Colaboración", "Listado por sección"): (colaboracion_por_seccion.__func__, ["seccion"]),
     }
 
     # ============== FUNCIONES DE GRÁFICOS ==============

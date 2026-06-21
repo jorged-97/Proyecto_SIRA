@@ -1144,3 +1144,25 @@ CREATE TABLE `usuarios` (
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2026-03-05 16:53:51
+
+-- ============================================================
+-- Tabla de colaboración de inscripción (pago opcional por estudiante por año escolar)
+-- ============================================================
+
+DROP TABLE IF EXISTS `colaboracion_inscripcion`;
+CREATE TABLE `colaboracion_inscripcion` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `estudiante_id` int NOT NULL,
+  `anio_escolar_id` int NOT NULL,
+  `colaboro` tinyint(1) NOT NULL DEFAULT '0',
+  `fecha_registro` date DEFAULT NULL,
+  `registrado_por` int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_estudiante_anio` (`estudiante_id`, `anio_escolar_id`),
+  KEY `fk_colab_estudiante` (`estudiante_id`),
+  KEY `fk_colab_anio` (`anio_escolar_id`),
+  KEY `fk_colab_usuario` (`registrado_por`),
+  CONSTRAINT `fk_colab_estudiante` FOREIGN KEY (`estudiante_id`) REFERENCES `estudiantes` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_colab_anio` FOREIGN KEY (`anio_escolar_id`) REFERENCES `anio_escolar` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_colab_usuario` FOREIGN KEY (`registrado_por`) REFERENCES `usuarios` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

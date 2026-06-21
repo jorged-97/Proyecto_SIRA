@@ -3834,7 +3834,7 @@ background-color: transparent;</string>
         <bool>true</bool>
        </property>
       </widget>
-      <widget class="QLabel" name="lblMin_4">
+      <widget class="QLabel" name="lblTipoGrafica">
        <property name="geometry">
         <rect>
          <x>750</x>

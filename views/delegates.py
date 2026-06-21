@@ -45,7 +45,7 @@ class BaseEstadoDelegate(QStyledItemDelegate):
             return
 
 class EstudianteDelegate(BaseEstadoDelegate):
-    def __init__(self, parent=None, estado_columna=16):
+    def __init__(self, parent=None, estado_columna=17):
         super().__init__(parent, estado_columna)
 
 class EmpleadoDelegate(BaseEstadoDelegate):

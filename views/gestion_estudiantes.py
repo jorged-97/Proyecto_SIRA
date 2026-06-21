@@ -18,6 +18,7 @@ from utils.archivos import abrir_archivo
 from views.registro_estudiante import NuevoRegistro
 from views.detalles_estudiante import DetallesEstudiante
 from models.estu_model import EstudianteModel
+from models.colaboracion_model import ColaboracionModel
 from views.delegates import EstudianteDelegate
 from utils.proxies import ProxyConEstado
 from datetime import datetime
@@ -54,7 +55,7 @@ class GestionEstudiantesPage(QWidget):
         self.lblConectado_como.setText(f"Conectado como: {self.usuario_actual['username']}")
         
         # Configurar proxy para filtrado y ocultamiento de inactivos
-        self.proxy_estudiantes = ProxyConEstado(columna_estado=16, parent=self)
+        self.proxy_estudiantes = ProxyConEstado(columna_estado=17, parent=self)
         self.tableW_students.setModel(self.proxy_estudiantes)
         
         # Conectar controles de filtrado
@@ -107,11 +108,6 @@ class GestionEstudiantesPage(QWidget):
         self.btnExportar_estu.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         menu_exportar_estu = QMenu(self.btnExportar_estu)
         # Agregar opciones de exportación
-        #menu_exportar_estu.addAction("Constancia de estudios (PDF)", self.exportar_constancia_estudios)
-        #menu_exportar_estu.addAction("Constancia de estudios (DOCX)", self.exportar_constancia_estudios_docx)
-        #menu_exportar_estu.addAction("Constancia de buena conducta", self.exportar_buena_conducta)
-        #menu_exportar_estu.addAction("Constancia de inscripción", self.exportar_constancia_inscripcion)
-        #menu_exportar_estu.addSeparator()
         menu_exportar_estu.addAction("Exportar tabla filtrada a Excel", self.exportar_excel_estudiantes)
         menu_exportar_estu.addAction("Exportar matrícula completa a Excel", 
                                      self.exportar_excel_estudiantes_bd)
@@ -195,12 +191,15 @@ class GestionEstudiantesPage(QWidget):
                 "ID", "Cédula", "Nombres", "Apellidos", "Fecha Nac.",
                 "Edad", "Ciudad", "Género", "Dirección", "Tipo Educ.",
                 "Grado", "Sección", "Docente", "TallaC",
-                "TallaP", "TallaZ", "Estado", "Fecha Ingreso"
+                "TallaP", "TallaZ", "Colaboración", "Estado", "Fecha Ingreso"
             ]
 
             # Crear modelo base
             model_estudiantes = QStandardItemModel(len(datos), len(columnas))
             model_estudiantes.setHorizontalHeaderLabels(columnas)
+
+            # Obtener mapa de colaboración del año actual
+            mapa_colab = ColaboracionModel.obtener_mapa_colaboracion_anio(self.anio_escolar['id'])
 
             # Poblar modelo con los datos
             for fila, registro in enumerate(datos):
@@ -227,6 +226,7 @@ class GestionEstudiantesPage(QWidget):
                 item_talla_c = QStandardItem(registro["tallaC"] or "")
                 item_talla_p = QStandardItem(registro["tallaP"] or "")
                 item_talla_z = QStandardItem(registro["tallaZ"] or "")
+                item_colaboracion = QStandardItem("Sí" if mapa_colab.get(registro["id"]) else "No")
                 item_estado = QStandardItem(registro["estado"])
                 
                 # Formatear fecha de ingreso
@@ -240,7 +240,7 @@ class GestionEstudiantesPage(QWidget):
                     item_id, item_cedula, item_nombres, item_apellidos, item_fecha,
                     item_edad, item_ciudad, item_genero, item_direccion, item_tipo_edu,
                     item_grado, item_seccion, item_docente, item_talla_c,
-                    item_talla_p, item_talla_z, item_estado, item_fecha_ing
+                    item_talla_p, item_talla_z, item_colaboracion, item_estado, item_fecha_ing
                 ]
 
                 # Agregar items al modelo (no editables)
@@ -339,7 +339,7 @@ class GestionEstudiantesPage(QWidget):
             13: 13,  # TallaC
             14: 14,  # TallaP
             15: 15,  # TallaZ
-            16: 17   # Fecha Ingreso (columna 16 es Estado, manejada por proxy)
+            16: 18   # Fecha Ingreso (columna 17 es Estado, manejada por proxy)
         }
 
         # Obtener columna seleccionada en el combo

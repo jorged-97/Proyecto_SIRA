@@ -280,6 +280,17 @@ class EstudianteModel:
                     VALUES (%s, %s, %s, CURDATE())
                 """, (estudiante_id, seccion_id, anio_actual))
 
+            anio_escolar_actual = AnioEscolarModel.obtener_actual()
+            if anio_escolar_actual:
+                try:
+                    cursor.execute(
+                        """INSERT IGNORE INTO colaboracion_inscripcion (estudiante_id, anio_escolar_id, colaboro)
+                           VALUES (%s, %s, 0)""",
+                        (estudiante_id, anio_escolar_actual['id'])
+                    )
+                except Exception:
+                    pass
+
             # 4. Commit de la transacción
             conexion.commit()
 

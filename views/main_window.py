@@ -18,12 +18,14 @@ from utils.exportar import (
     generar_constancia_trabajo, generar_constancia_retiro,
     generar_historial_estudiante_pdf, generar_historial_notas_pdf,
     generar_certificado_promocion_sexto,
-    generar_certificado_promocion_sexto_docx, generar_certificado_prosecucion_primaria
+    generar_certificado_promocion_sexto_docx, generar_certificado_prosecucion_primaria, 
+    generar_listado_colaboracion_seccion
 )
 from utils.backup import BackupManager
 from models.estu_model import EstudianteModel
 from models.emple_model import EmpleadoModel
 from models.notas_model import NotasModel
+from models.colaboracion_model import ColaboracionModel
 
 from datetime import datetime
 
@@ -717,7 +719,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             self.frameCriterio.setVisible(True)
 
             # Ocultar controles de estadísticos
-            self.lblMin_4.setVisible(False)
+            self.lblTipoGrafica.setVisible(False)
             self.frameTipoGrafica.setVisible(False)
             self.lblMin.setVisible(False)
             self.lblMax.setVisible(False)
@@ -743,6 +745,9 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             self.cbxPoblacion.blockSignals(True)
             self.cbxPoblacion.clear()
             self.cbxPoblacion.addItems(self._poblacion_items_original)
+            # Asegurar que Colaboración esté incluida
+            if "Colaboración" not in self._poblacion_items_original:
+                self.cbxPoblacion.addItem("Colaboración")
             model_pob = self.cbxPoblacion.model()
             item0 = model_pob.item(0)
             if item0:
@@ -756,7 +761,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             self.lblCriterio.setText("Criterio")
             self.lblCriterio.setVisible(True)
             self.frameCriterio.setVisible(True)
-            self.lblMin_4.setVisible(True)
+            self.lblTipoGrafica.setVisible(True)
             self.frameTipoGrafica.setVisible(True)
 
             # Ocultar controles de constancia
@@ -792,7 +797,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             self.cbxCriterio.setEnabled(False)
 
             # Ocultar resto de controles
-            self.lblMin_4.setVisible(False)
+            self.lblTipoGrafica.setVisible(False)
             self.frameTipoGrafica.setVisible(False)
             self.lneBuscar_constancia.setVisible(False)
             self.lblMin.setVisible(False)
@@ -983,6 +988,22 @@ class MainWindow(QMainWindow, UiMainWindowBase):
                 if hasattr(self, 'lblSeccion_reporte'):
                     self.lblSeccion_reporte.setVisible(True)
 
+        elif criterio == "Listado por sección":
+            if hasattr(self, 'cbxSeccion_reporte'):
+                secciones = CriteriosReportes.obtener_secciones_activas()
+                self.cbxSeccion_reporte.clear()
+                self.cbxSeccion_reporte.addItem("Seleccione una sección")
+                self.cbxSeccion_reporte.addItems(secciones)
+                self.cbxSeccion_reporte.setVisible(True)
+                self.cbxTipoGrafica.setEnabled(False)
+                self.cbxTipoGrafica.setVisible(False)
+                self.frameTipoGrafica.setVisible(False)
+                self.lblTipoGrafica.setVisible(False)
+                if hasattr(self, 'frameSeccion_reporte'):
+                    self.frameSeccion_reporte.setVisible(True)
+                if hasattr(self, 'lblSeccion_reporte'):
+                    self.lblSeccion_reporte.setVisible(True)
+
         # Configurar tipos de gráfica
         if idx > 0:
             self.actualizar_tipos_grafica()
@@ -1017,6 +1038,8 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             self._generar_constancia()
         elif self._modo_reporte == "RAC":
             self._generar_rac()
+        elif self.cbxPoblacion.currentText() == "Colaboración" and self.cbxCriterio.currentText() == "Listado por sección":
+            self._generar_listado_colaboracion()
         else:
             self.actualizar_reporte()
 
@@ -1026,6 +1049,8 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             self._exportar_constancia()
         elif self._modo_reporte == "RAC":
             self._generar_rac()
+        elif self.cbxPoblacion.currentText() == "Colaboración" and self.cbxCriterio.currentText() == "Listado por sección":
+            self._generar_listado_colaboracion()
         else:
             self.on_exportar_reporte()
 
@@ -1430,6 +1455,93 @@ class MainWindow(QMainWindow, UiMainWindowBase):
                 self,
                 "Error",
                 f"No se pudo exportar el reporte: {e}",
+                QMessageBox.Icon.Critical
+            ).exec()
+
+    def _generar_listado_colaboracion(self):
+        """Genera un listado PDF de colaboración de inscripción por sección."""
+        if not hasattr(self, 'cbxSeccion_reporte') or self.cbxSeccion_reporte.currentIndex() <= 0:
+            crear_msgbox(
+                self,
+                "Sin sección",
+                "Debe seleccionar una sección para generar el listado.",
+                QMessageBox.Icon.Warning
+            ).exec()
+            return
+
+        seccion_nombre = self.cbxSeccion_reporte.currentText().strip()
+        partes = seccion_nombre.rsplit(' ', 1)
+        if len(partes) < 2:
+            crear_msgbox(
+                self,
+                "Sección inválida",
+                "Formato de sección no reconocido.",
+                QMessageBox.Icon.Warning
+            ).exec()
+            return
+
+        grado = partes[0]
+        letra = partes[1]
+
+        anio = AnioEscolarModel.obtener_actual()
+        if not anio:
+            crear_msgbox(
+                self,
+                "Error",
+                "No hay año escolar activo.",
+                QMessageBox.Icon.Critical
+            ).exec()
+            return
+
+        estudiantes = ColaboracionModel.listar_colaboracion_por_seccion(grado, letra, anio['id'])
+        if not estudiantes:
+            crear_msgbox(
+                self,
+                "Sin datos",
+                "No hay estudiantes en la sección seleccionada.",
+                QMessageBox.Icon.Information
+            ).exec()
+            return
+
+        seccion_dict = {"nivel": "", "grado": grado, "letra": letra}
+        conn = None
+        cursor = None
+        try:
+            from utils.db import get_connection
+            conn = get_connection()
+            if conn:
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute(
+                    "SELECT nivel FROM secciones WHERE grado = %s AND letra = %s AND año_escolar_id = %s AND activo = 1 LIMIT 1",
+                    (grado, letra, anio['id'])
+                )
+                row = cursor.fetchone()
+                if row:
+                    seccion_dict['nivel'] = row['nivel']
+        except Exception:
+            pass
+        finally:
+            if cursor:
+                cursor.close()
+            if conn and conn.is_connected():
+                conn.close()
+
+        institucion = InstitucionModel.obtener_por_id(1)
+        resultado = generar_listado_colaboracion_seccion(seccion_dict, estudiantes, institucion)
+
+        if resultado and not resultado.startswith("Error"):
+            crear_msgbox(
+                self,
+                "Éxito",
+                f"Listado de colaboración generado correctamente.",
+                QMessageBox.Icon.Information
+            ).exec()
+            abrir_archivo(resultado)
+        else:
+            crear_msgbox(
+                self,
+                "Error",
+                resultado,
                 QMessageBox.Icon.Critical
             ).exec()
     

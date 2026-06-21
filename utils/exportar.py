@@ -1912,7 +1912,6 @@ def exportar_empleados_excel(parent, empleados: list) -> str:
             ).exec()
         return None
 
-
 def generar_certificado_promocion_sexto(estudiante: dict, institucion: dict, anio_escolar_egreso: str) -> str:
     """Genera certificado de promoción de 6to grado a 1er año de secundaria."""
     # Mapear campos de BD a formato esperado
@@ -2473,6 +2472,171 @@ def generar_listado_estudiantes_seccion(seccion: dict, estudiantes: list, docent
         return f"Error generando listado: {e}"
 
 
+def generar_listado_colaboracion_seccion(seccion: dict, estudiantes: list, institucion: dict) -> str:
+    """Genera un listado en PDF de colaboración de inscripción por sección."""
+    if not seccion:
+        return "Error: No se proporcionaron datos de la sección."
+
+    campos_inst = ["director", "director_ci", "nombre"]
+    valido, mensaje = validar_datos_exportacion(institucion, campos_inst)
+    if not valido:
+        return mensaje
+
+    carpeta = os.path.join(os.getcwd(), "exportados", "Listados de secciones")
+    ok, msg = crear_carpeta_segura(carpeta)
+    if not ok:
+        return msg
+
+    nivel = seccion.get('nivel', 'Nivel')
+    grado = seccion.get('grado', 'Grado')
+    letra = seccion.get('letra', 'Seccion')
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    nombre_base = sanitizar_nombre_archivo(f"Colaboracion_{nivel}_{grado}_{letra}_{timestamp}")
+    nombre_archivo = os.path.join(carpeta, f"{nombre_base}.pdf")
+
+    try:
+        doc = SimpleDocTemplate(
+            nombre_archivo,
+            pagesize=letter,
+            leftMargin=80,
+            rightMargin=80,
+            topMargin=180,
+            bottomMargin=50
+        )
+
+        elementos = []
+
+        titulo_style = ParagraphStyle(
+            name="TituloColaboracion",
+            parent=styles["Heading1"],
+            alignment=TA_CENTER,
+            fontSize=12,
+            spaceAfter=8,
+            textColor=colors.HexColor("#2c3e50")
+        )
+
+        titulo_texto = f"LISTADO DE COLABORACIÓN DE INSCRIPCIÓN<br/>{nivel} - {grado} Sección {letra}"
+        titulo = Paragraph(titulo_texto, titulo_style)
+        elementos.append(titulo)
+        elementos.append(Spacer(1, 4))
+
+        total_estudiantes = len(estudiantes)
+        colaboraron = sum(1 for e in estudiantes if e.get('colaboro'))
+        no_colaboraron = total_estudiantes - colaboraron
+
+        info_style_izq = ParagraphStyle(
+            name="InfoIzq",
+            parent=styles["Normal"],
+            fontSize=9,
+            alignment=TA_LEFT,
+            textColor=colors.HexColor("#333333")
+        )
+        info_style_der = ParagraphStyle(
+            name="InfoDer",
+            parent=styles["Normal"],
+            fontSize=9,
+            alignment=TA_RIGHT,
+            textColor=colors.HexColor("#333333")
+        )
+
+        resumen_izq = f"<b>Total:</b> {total_estudiantes}  |  <b>Colaboraron:</b> {colaboraron}  |  <b>No colaboraron:</b> {no_colaboraron}"
+        if total_estudiantes > 0:
+            porcentaje = round((colaboraron / total_estudiantes) * 100, 1)
+        else:
+            porcentaje = 0.0
+        resumen_der = f"<b>% Colaboración:</b> {porcentaje}%"
+
+        info_tabla = Table(
+            [[Paragraph(resumen_izq, info_style_izq), Paragraph(resumen_der, info_style_der)]],
+            colWidths=[300, 185]
+        )
+        info_tabla.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+
+        elementos.append(info_tabla)
+        elementos.append(Spacer(1, 8))
+
+        datos_tabla = [[
+            "N°",
+            "Cédula Escolar",
+            "Apellidos",
+            "Nombres",
+            "Edad",
+            "Género",
+            "Colaboró"
+        ]]
+
+        for idx, est in enumerate(estudiantes, start=1):
+            cedula = str(est.get('cedula', 'N/A'))
+            apellidos = str(est.get('apellidos', '')).strip().upper()
+            nombres = str(est.get('nombres', '')).strip().upper()
+
+            edad = est.get('edad', None)
+            if edad is not None and isinstance(edad, (int, float)):
+                edad_str = f"{int(edad)} años"
+            else:
+                edad_str = "N/A"
+
+            genero = str(est.get('genero', 'N/A')).upper()
+
+            colab = "Sí" if est.get('colaboro') else "No"
+
+            datos_tabla.append([
+                str(idx),
+                cedula,
+                apellidos,
+                nombres,
+                edad_str,
+                genero,
+                colab
+            ])
+
+        tabla = Table(datos_tabla, colWidths=[25, 90, 120, 120, 50, 40, 55], rowHeights=13)
+
+        estilos = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1a5490")),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
+
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 7.5),
+            ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+            ('ALIGN', (1, 1), (1, -1), 'CENTER'),
+            ('ALIGN', (4, 1), (4, -1), 'CENTER'),
+            ('ALIGN', (5, 1), (5, -1), 'CENTER'),
+            ('ALIGN', (6, 1), (6, -1), 'CENTER'),
+            ('VALIGN', (0, 1), (-1, -1), 'MIDDLE'),
+
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor("#1a5490")),
+        ]
+
+        for i in range(2, len(datos_tabla), 2):
+            estilos.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#f0f0f0")))
+
+        for i in range(1, len(datos_tabla)):
+            colab_val = datos_tabla[i][6]
+            if colab_val == "Sí":
+                estilos.append(('TEXTCOLOR', (6, i), (6, i), colors.HexColor("#27ae60")))
+                estilos.append(('FONTNAME', (6, i), (6, i), 'Helvetica-Bold'))
+            else:
+                estilos.append(('TEXTCOLOR', (6, i), (6, i), colors.HexColor("#e74c3c")))
+
+        tabla.setStyle(TableStyle(estilos))
+        elementos.append(tabla)
+
+        doc.build(elementos, onFirstPage=encabezado_y_pie, onLaterPages=encabezado_y_pie)
+
+        return nombre_archivo
+
+    except Exception as e:
+        return f"Error generando listado de colaboración: {e}"
+
+
 def generar_reporte_rac(parent, empleados: list, institucion: dict) -> str:
     """Genera reporte RAC (Registro de Asignación de Cargos) en formato Excel."""
     if not empleados:
@@ -2826,7 +2990,7 @@ def generar_reporte_rac(parent, empleados: list, institucion: dict) -> str:
         return None
 
 def generar_cuadratura_excel(parent) -> str:
-    """Genera la Cuadratura Maternal, Inicial y Primaria en formato Excel"""
+    """Genera la Cuadratura Inicial y Primaria en formato Excel"""
     try:
         anio = AnioEscolarModel.obtener_actual()
         if not anio:
@@ -3007,7 +3171,7 @@ def generar_cuadratura_excel(parent) -> str:
 
         light_fill = PatternFill(start_color="D9E2F3", end_color="D9E2F3", fill_type="solid")
 
-        # ── Row 2: Título ──
+        # Row 2: Título
         ws.cell(row=2, column=8, value="CUADRATURA MATERNAL, INICIAL Y ").font = font_title
         ws.cell(row=2, column=8).alignment = align_center
         ws.merge_cells(
@@ -3015,7 +3179,7 @@ def generar_cuadratura_excel(parent) -> str:
             end_row=2, end_column=last_data_col
         )
 
-        # ── Row 3: Info institucional ──
+        # Row 3: Info institucional
         col3 = 8
         ws.cell(row=3, column=col3, value="Codigo Interno del Plantel").font = font_label
         ws.cell(row=3, column=col3).alignment = align_center
@@ -3040,11 +3204,10 @@ def generar_cuadratura_excel(parent) -> str:
         if col3 <= last_data_col:
             ws.merge_cells(start_row=3, start_column=col3, end_row=3, end_column=last_data_col)
 
-        # ── Row 4: Vacía ──
-
-        # ── Row 5: Grade labels + SECCIONES labels ──
-        # ── Row 6: Section sub-labels (rotated 90°) ──
-        # ── Row 7: C.I. / Nombre del Docente / MATRICULA ──
+        # Row 4: Vacía
+        # Row 5: Grade labels + SECCIONES labels
+        # Row 6: Section sub-labels (rotated 90°)
+        # Row 7: C.I. / Nombre del Docente / MATRICULA
 
         for bk in BLOCK_ORDER:
             cfg = GRADO_MAP[bk]
@@ -3076,12 +3239,12 @@ def generar_cuadratura_excel(parent) -> str:
                 ws.cell(row=6, column=col, value=label).font = font_section_row6
                 ws.cell(row=6, column=col).alignment = align_left_rot90
 
-            # Row 7: MATRICULA (merged across grade + gap + secciones)
+            # Row 7: MATRICULA
             if bloque_sec_cols[bk] is not None:
                 sec_start, sec_end = bloque_sec_cols[bk]
                 n_sec = sec_end - sec_start + 1
 
-                # Row 5: SECCIONES label
+                # Row 5: SECCIONES
                 ws.cell(row=5, column=sec_start, value="SECCIONES").font = font_section_row5
                 ws.cell(row=5, column=sec_start).alignment = align_center
                 if sec_end > sec_start:
@@ -3090,13 +3253,13 @@ def generar_cuadratura_excel(parent) -> str:
                         end_row=5, end_column=sec_end
                     )
 
-                # Row 6: secciones sub-labels (empty, just formatting)
+                # Row 6: secciones sub-labels
                 for i in range(n_sec):
                     col = sec_start + i
                     ws.cell(row=6, column=col).font = font_section_row6
                     ws.cell(row=6, column=col).alignment = align_left_rot90
 
-                # Row 7: MATRICULA merged across all cols in block
+                # Row 7: MATRICULA
                 mat_start = grade_start
                 mat_end = sec_end
                 ws.cell(row=7, column=mat_start, value="MATRICULA").font = font_row7
@@ -3106,11 +3269,9 @@ def generar_cuadratura_excel(parent) -> str:
                         start_row=7, start_column=mat_start,
                         end_row=7, end_column=mat_end
                     )
-                # Apply matricula border to all cells in merge
                 for c in range(mat_start, mat_end + 1):
                     ws.cell(row=7, column=c).border = border_matricula
             else:
-                # MATERNAL: no separate SECCIONES area
                 mat_start = grade_start
                 mat_end = grade_end
                 ws.cell(row=7, column=mat_start, value="MATRICULA").font = font_row7
@@ -3123,8 +3284,7 @@ def generar_cuadratura_excel(parent) -> str:
                 for c in range(mat_start, mat_end + 1):
                     ws.cell(row=7, column=c).border = border_matricula
 
-        # ── Fixed columns A-G headers (rows 6-7) ──
-        # A (col 1): N° - no header needed, just numbering
+        # A (col 1): N°
         # B (col 2): C.I.
         ws.cell(row=7, column=2, value="C.I.").font = font_row7
         ws.cell(row=7, column=2).alignment = align_center
@@ -3133,32 +3293,27 @@ def generar_cuadratura_excel(parent) -> str:
         ws.cell(row=7, column=3, value="Nombre del Docente").font = font_row7
         ws.cell(row=7, column=3).alignment = align_center
         ws.cell(row=7, column=3).border = border_header_right
-
         # D (col 4): CARGA HORARIA
         ws.cell(row=6, column=4, value="CARGA HORARIA (RECIBO DE PAGO)").font = font_section_row6_small
         ws.cell(row=6, column=4).alignment = align_center_rot90
         ws.merge_cells(start_row=6, start_column=4, end_row=7, end_column=4)
         ws.cell(row=6, column=4).border = border_header_full
-
         # E (col 5): TITULAR/INTERINO
         ws.cell(row=6, column=5, value="TITULAR/ INTERINO").font = font_section_row6_small
         ws.cell(row=6, column=5).alignment = align_center_rot90
         ws.merge_cells(start_row=6, start_column=5, end_row=7, end_column=5)
         ws.cell(row=6, column=5).border = border_header_full
-
         # F (col 6): TURNO
         ws.cell(row=6, column=6, value="TURNO (MAÑANA, TARDE. INTEGRAL)").font = font_section_row6_small
         ws.cell(row=6, column=6).alignment = align_center_rot90
         ws.merge_cells(start_row=6, start_column=6, end_row=7, end_column=6)
         ws.cell(row=6, column=6).border = border_header_full
-
         # G (col 7): TIPO DE PERSONAL
         ws.cell(row=6, column=7, value="TIPO DE PERSONAL (Doc,Adm,Obr)").font = font_section_row6_small
         ws.cell(row=6, column=7).alignment = align_center_rot90
         ws.merge_cells(start_row=6, start_column=7, end_row=7, end_column=7)
         ws.cell(row=6, column=7).border = border_header_right
 
-        # Apply borders to row 5 header cells
         for bk in BLOCK_ORDER:
             grade_start, grade_end = bloque_grade_cols[bk]
             for c in range(grade_start, grade_end + 1):
@@ -3179,14 +3334,14 @@ def generar_cuadratura_excel(parent) -> str:
                     else:
                         cell.border = border_header_full
 
-        # ── Row heights ──
+        # Row heights
         ws.row_dimensions[3].height = 21.75
         ws.row_dimensions[4].height = 16.5
         ws.row_dimensions[5].height = 17.25
         ws.row_dimensions[6].height = 144.75
         ws.row_dimensions[7].height = 17.25
 
-        # ── Column widths ──
+        # Column widths
         ws.column_dimensions['A'].width = 4.4
         ws.column_dimensions['B'].width = 14.1
         ws.column_dimensions['C'].width = 33.7
@@ -3202,12 +3357,11 @@ def generar_cuadratura_excel(parent) -> str:
 
             if bloque_sec_cols[bk] is not None:
                 sec_start, sec_end = bloque_sec_cols[bk]
-                # Gap column between grade and secciones
                 ws.column_dimensions[get_column_letter(sec_start - 1)].width = 0.2
                 for c in range(sec_start, sec_end + 1):
                     ws.column_dimensions[get_column_letter(c)].width = 3.7
 
-        # ── Employee data rows ──
+        # Employee data rows
         data_start_row = 8
 
         # Build a mapping: (docente_id) -> {bloque_key: seccion_col}
@@ -3321,7 +3475,6 @@ def generar_cuadratura_excel(parent) -> str:
                     ws.cell(row=row, column=target_col).value = "X"
                     ws.cell(row=row, column=target_col).font = font_data_bold
 
-            # Light fill for data rows
             for c in range(1, last_data_col + 1):
                 ws.cell(row=row, column=c).fill = light_fill
 
@@ -3347,7 +3500,6 @@ def generar_cuadratura_excel(parent) -> str:
 
 def generar_historial_notas_pdf(estudiante: dict, notas: list) -> str:
     """Genera un PDF con el historial de notas completo del estudiante."""
-    
     # Validar datos
     campos_est = ["Nombres", "Apellidos", "Cédula"]
     valido, mensaje = validar_datos_exportacion(estudiante, campos_est)

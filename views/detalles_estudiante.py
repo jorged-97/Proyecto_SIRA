@@ -8,7 +8,9 @@ from models.repre_model import RepresentanteModel
 from models.estu_model import EstudianteModel
 from models.institucion_model import InstitucionModel
 from models.notas_model import NotasModel
+from models.colaboracion_model import ColaboracionModel
 from models.secciones_model import SeccionesModel
+from models.anio_model import AnioEscolarModel
 from utils.db import get_connection
 from utils.widgets import Switch
 from utils.exportar import (
@@ -80,6 +82,16 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
         self.switchActivo.setChecked(bool(self.estudiante_actual.get("Estado", 1)))
         self.actualizando_switch = False
 
+        # Inicializar switch de colaboración
+        self.switchColaboracion = Switch()
+        self.switchColaboracion.setFixedSize(50, 25)
+        self.contenedorSwitchColaboracion.layout().addWidget(self.switchColaboracion)
+
+        self.actualizando_switch = True
+        colaboro = ColaboracionModel.obtener_estado_actual(self.id_estudiante)
+        self.switchColaboracion.setChecked(bool(colaboro))
+        self.actualizando_switch = False
+
         # Configurar visibilidad según tipo (egresado vs regular)
         self.configurar_visibilidad_campos()
 
@@ -101,6 +113,7 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
         
         # Conectar la señal del switch después de establecer el estado inicial
         self.switchActivo.stateChanged.connect(self.cambiar_estado_estudiante)
+        self.switchColaboracion.stateChanged.connect(self.cambiar_colaboracion)
 
         # Aplicar efectos visuales (sombras flotantes)
         self.aplicar_sombras()
@@ -752,6 +765,29 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
         self.lblEstado_ficha_estu.setText("Activo" if estado else "Inactivo")
         self.actualizando_switch = False
 
+    def cambiar_colaboracion(self, state):
+        if self.actualizando_switch:
+            return
+        self.actualizando_switch = True
+        colaboro = state == 2
+        anio_actual = AnioEscolarModel.obtener_actual()
+        if not anio_actual:
+            crear_msgbox(self, "Error", "No se pudo obtener el año escolar actual.",
+                         QMessageBox.Icon.Warning).exec()
+            self.switchColaboracion.setChecked(not colaboro)
+            self.actualizando_switch = False
+            return
+
+        ok, msg = ColaboracionModel.registrar(
+            self.id_estudiante, anio_actual['id'], colaboro, self.usuario_actual
+        )
+
+        if not ok:
+            crear_msgbox(self, "Error", msg, QMessageBox.Icon.Critical).exec()
+            self.switchColaboracion.setChecked(not colaboro)
+
+        self.actualizando_switch = False
+
     def actualizar_edad_estudiante(self):
         """Calcula y muestra la edad del estudiante."""
         fecha_nac = self.lneFechaNac_ficha_estu.date().toPython()
@@ -1355,6 +1391,9 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
             self.btnDevolver_grado.setVisible(False)
             self.switchActivo.setVisible(False)
             self.lblEstado_ficha_estu.setVisible(False)
+            self.contenedorSwitchColaboracion.setVisible(False)
+            if hasattr(self, 'label_50'):
+                self.label_50.setVisible(False)
         else:
             # --- MODO REGULAR (EDITABLE) ---
             
@@ -1383,6 +1422,9 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
             self.btnDevolver_grado.setVisible(True)
             self.switchActivo.setVisible(True) 
             self.lblEstado_ficha_estu.setVisible(True)
+            self.contenedorSwitchColaboracion.setVisible(True)
+            if hasattr(self, 'label_50'):
+                self.label_50.setVisible(True)
 
     def _obtener_indice_grado(self, nivel, grado):
         """Retorna el índice numérico del grado para comparación.

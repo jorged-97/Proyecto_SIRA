@@ -1933,7 +1933,7 @@ QPushButton:checked {
 color: #2d2d2d;</string>
      </property>
      <property name="currentIndex">
-      <number>1</number>
+      <number>5</number>
      </property>
      <widget class="QWidget" name="home">
       <property name="maximumSize">
@@ -3879,7 +3879,7 @@ background-color: transparent;</string>
         <bool>true</bool>
        </property>
       </widget>
-      <widget class="QLabel" name="lblMin_4">
+      <widget class="QLabel" name="lblTipoGrafica">
        <property name="geometry">
         <rect>
          <x>580</x>

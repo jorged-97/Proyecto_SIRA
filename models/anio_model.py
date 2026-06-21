@@ -1,5 +1,6 @@
 from utils.db import get_connection
 from models.auditoria_model import AuditoriaModel
+from models.colaboracion_model import ColaboracionModel
 from typing import Optional, Dict, List, Tuple
 from datetime import datetime
 
@@ -263,7 +264,7 @@ class AnioEscolarModel:
                         continue
 
                     nuevo_nivel, nuevo_grado = target
-                    # Misma lógica: preservar "Única" solo para 2do Nivel
+                    # preservar "Única" solo para 2do Nivel
                     if letra == "Única":
                         if nuevo_nivel == "Inicial" and nuevo_grado == "2do Nivel":
                             nueva_letra = "Única"
@@ -276,7 +277,6 @@ class AnioEscolarModel:
                     if clave_dest in mapa_secciones_nuevas:
                         seccion_destino_id = mapa_secciones_nuevas[clave_dest]
                         # Copiar materias de una sección del mismo grado destino del año anterior
-                        # (buscar sección del año anterior que tenga el mismo nivel/grado destino)
                         cursor.execute("""
                             SELECT id FROM secciones
                             WHERE año_escolar_id = %s AND nivel = %s AND grado = %s AND activo = 1
@@ -317,6 +317,11 @@ class AnioEscolarModel:
 
             # Commit de toda la transacción (año + secciones + promociones)
             conn.commit()
+
+            try:
+                ColaboracionModel.inicializar_anio(nuevo_anio_id, usuario_actual)
+            except Exception as e:
+                print(f"Advertencia: error inicializando colaboración: {e}")
 
             # 7. Auditoría
             descripcion = f"Apertura año {nombre}."

@@ -107,12 +107,11 @@ class GestionEmpleadosPage(QWidget):
         """Configura el menú de exportación."""
         self.btnExportar_emple.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         menu_exportar_emple = QMenu(self.btnExportar_emple)
-        #menu_exportar_emple.addAction("Constancia de trabajo PDF", self.exportar_constancia_empleado)
         menu_exportar_emple.addAction("Exportar tabla filtrada a Excel", self.exportar_excel_empleados)
         menu_exportar_emple.addAction("Exportar BD completa a Excel", self.exportar_excel_empleados_bd)
         menu_exportar_emple.addSeparator()
         menu_exportar_emple.addAction("Reporte RAC (Ministerio)", self.exportar_reporte_rac)
-        menu_exportar_emple.addAction("Cuadratura (Maternal, Inicial y Primaria)", self.exportar_cuadratura)
+        #menu_exportar_emple.addAction("Cuadratura (Inicial y Primaria)", self.exportar_cuadratura)
         self.btnExportar_emple.setMenu(menu_exportar_emple)
         
     def actualizar_conteo(self):
