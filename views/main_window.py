@@ -1050,7 +1050,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
         elif self._modo_reporte == "RAC":
             self._generar_rac()
         elif self.cbxPoblacion.currentText() == "Colaboración" and self.cbxCriterio.currentText() == "Listado por sección":
-            self._generar_listado_colaboracion()
+            self._exportar_listado_colaboracion()
         else:
             self.on_exportar_reporte()
 
@@ -1530,13 +1530,11 @@ class MainWindow(QMainWindow, UiMainWindowBase):
         resultado = generar_listado_colaboracion_seccion(seccion_dict, estudiantes, institucion)
 
         if resultado and not resultado.startswith("Error"):
-            crear_msgbox(
-                self,
-                "Éxito",
-                f"Listado de colaboración generado correctamente.",
-                QMessageBox.Icon.Information
-            ).exec()
-            abrir_archivo(resultado)
+            self._ruta_pdf_temporal = resultado
+            self.stackedReportes.setCurrentIndex(0)
+            self.pdf_document.close()
+            self.pdf_document.load(resultado)
+            self.pdf_viewer.setDocument(self.pdf_document)
         else:
             crear_msgbox(
                 self,
@@ -1544,6 +1542,20 @@ class MainWindow(QMainWindow, UiMainWindowBase):
                 resultado,
                 QMessageBox.Icon.Critical
             ).exec()
+
+    def _exportar_listado_colaboracion(self):
+        """Exporta el listado de colaboración previamente generado."""
+        if not self._ruta_pdf_temporal or not os.path.exists(self._ruta_pdf_temporal):
+            crear_msgbox(self, "Sin documento",
+                "Debe generar el listado primero.",
+                QMessageBox.Icon.Warning).exec()
+            return
+
+        crear_msgbox(self, "Éxito",
+            f"Listado exportado correctamente:\n{self._ruta_pdf_temporal}",
+            QMessageBox.Icon.Information).exec()
+
+        abrir_archivo(self._ruta_pdf_temporal)
     
     ### MODULO ADMIN ###
     

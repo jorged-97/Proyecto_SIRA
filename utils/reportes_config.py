@@ -560,6 +560,7 @@ class CriteriosReportes:
             if conn and conn.is_connected():
                 conn.close()
 
+    # ============== COLABORACIÓN ==============
     @staticmethod
     def colaboracion_por_anio():
         conn = get_connection()
