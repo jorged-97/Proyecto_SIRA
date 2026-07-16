@@ -15,6 +15,7 @@ from utils.exportar import (
     exportar_reporte_pdf,
     generar_constancia_estudios, generar_constancia_estudios_docx, generar_buena_conducta,
     generar_constancia_inscripcion, generar_constancia_prosecucion_inicial,
+    generar_constancia_aceptacion,
     generar_constancia_trabajo, generar_constancia_retiro,
     generar_historial_estudiante_pdf, generar_historial_notas_pdf,
     generar_certificado_promocion_sexto,
@@ -292,6 +293,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             "Constancia de estudios",
             "Constancia de estudios (DOCX)",
             "Constancia de inscripción",
+            "Constancia de aceptación",
             "Constancia de buena conducta",
             "Constancia de prosecución inicial",
             "Certif. de prosecución primaria",
@@ -1130,6 +1132,9 @@ class MainWindow(QMainWindow, UiMainWindowBase):
 
                 elif constancia == "Constancia de inscripción":
                     archivo = generar_constancia_inscripcion(estudiante, institucion)
+
+                elif constancia == "Constancia de aceptación":
+                    archivo = generar_constancia_aceptacion(institucion ,self.anio_escolar)
 
                 elif constancia == "Constancia de buena conducta":
                     archivo = generar_buena_conducta(estudiante, institucion, self.anio_escolar)

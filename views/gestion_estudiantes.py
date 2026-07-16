@@ -9,8 +9,7 @@ from models.dashboard_model import DashboardModel
 from models.institucion_model import InstitucionModel
 from utils.exportar import (
     generar_constancia_estudios, generar_constancia_estudios_docx, generar_buena_conducta,
-    exportar_tabla_excel, exportar_estudiantes_excel, generar_constancia_inscripcion,
-    generar_constancia_prosecucion_inicial, generar_certificado_promocion_sexto)
+    exportar_tabla_excel, exportar_estudiantes_excel, generar_constancia_inscripcion)
 from utils.sombras import crear_sombra_flotante
 from utils.logo_manager import aplicar_logo_a_label
 from utils.archivos import abrir_archivo
@@ -108,6 +107,12 @@ class GestionEstudiantesPage(QWidget):
         self.btnExportar_estu.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         menu_exportar_estu = QMenu(self.btnExportar_estu)
         # Agregar opciones de exportación
+        """menu_exportar_estu.addAction("Constancia de estudios (PDF)", self.exportar_constancia_estudios)
+        menu_exportar_estu.addAction("Constancia de estudios (DOCX)", self.exportar_constancia_estudios_docx)
+        menu_exportar_estu.addAction("Constancia de inscripción", self.exportar_constancia_inscripcion)
+        menu_exportar_estu.addAction("Constancia de aceptación", self.exportar_constancia_aceptacion)
+        menu_exportar_estu.addAction("Constancia de buena conducta", self.exportar_buena_conducta)
+        menu_exportar_estu.addSeparator()"""
         menu_exportar_estu.addAction("Exportar tabla filtrada a Excel", self.exportar_excel_estudiantes)
         menu_exportar_estu.addAction("Exportar matrícula completa a Excel", 
                                      self.exportar_excel_estudiantes_bd)
@@ -509,7 +514,7 @@ class GestionEstudiantesPage(QWidget):
                 f"No se pudo generar constancia de inscripción:\n{e}",
                 QMessageBox.Icon.Critical
             ).exec()
-    
+
     def exportar_buena_conducta(self):
         """Genera constancia de buena conducta del estudiante seleccionado"""
         self._exportar_constancia_generica(

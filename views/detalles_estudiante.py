@@ -16,6 +16,7 @@ from utils.widgets import Switch
 from utils.exportar import (
     generar_constancia_estudios, generar_constancia_estudios_docx, generar_buena_conducta,
     generar_constancia_inscripcion, generar_constancia_prosecucion_inicial,
+    generar_constancia_aceptacion,
     generar_constancia_retiro, generar_historial_estudiante_pdf,
     generar_historial_notas_pdf, generar_certificado_promocion_sexto,
     generar_certificado_promocion_sexto_docx, generar_certificado_prosecucion_primaria
@@ -128,6 +129,7 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
         menu_exportar_estu.addAction("Constancia de estudios (DOCX)", self.exportar_constancia_estudios_docx)
         menu_exportar_estu.addAction("Constancia de buena conducta", self.exportar_buena_conducta)
         menu_exportar_estu.addAction("Constancia de inscripción", self.exportar_constancia_inscripcion)
+        menu_exportar_estu.addAction("Constancia de aceptación", self.exportar_constancia_aceptacion)
         menu_exportar_estu.addAction("Constancia prosecución Educación Inicial", 
                                      self.exportar_constancia_prosecucion_inicial)
         menu_exportar_estu.addAction("Certif. prosecución primaria", self.exportar_certificado_prosecucion_primaria)
@@ -189,6 +191,17 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
             estudiante = self.obtener_estudiante_actual_dict()
             institucion = InstitucionModel.obtener_por_id(1)
             archivo = generar_constancia_inscripcion(estudiante, institucion)
+            crear_msgbox(self, "Éxito", f"Constancia generada:\n{archivo}", QMessageBox.Icon.Information).exec()
+            abrir_archivo(archivo)
+        except Exception as e:
+            crear_msgbox(self, "Error", f"No se pudo generar:\n{e}", QMessageBox.Icon.Critical).exec()
+
+    def exportar_constancia_aceptacion(self):
+        """Genera constancia de aceptación."""
+        try:
+            estudiante = self.obtener_estudiante_actual_dict()
+            institucion = InstitucionModel.obtener_por_id(1)
+            archivo = generar_constancia_aceptacion(estudiante, institucion, self.anio_escolar)
             crear_msgbox(self, "Éxito", f"Constancia generada:\n{archivo}", QMessageBox.Icon.Information).exec()
             abrir_archivo(archivo)
         except Exception as e:

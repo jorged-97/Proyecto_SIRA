@@ -22,6 +22,7 @@ from models.institucion_model import InstitucionModel
 from models.secciones_model import SeccionesModel
 from models.anio_model import AnioEscolarModel
 from models.emple_model import EmpleadoModel
+from models.repre_model import RepresentanteModel
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -1141,6 +1142,87 @@ def generar_constancia_inscripcion(estudiante: dict, institucion: dict) -> str:
         anio = fecha_hoy.year
         
         texto_fecha = f"Certificado que se expide en <b>PUERTO LA CRUZ</b>, a los <b>{dia}</b> días del mes de <b>{mes_es}</b> de <b>{anio}</b>"
+        story.append(Paragraph(texto_fecha, justificado))
+        story.append(Spacer(1, 150))
+
+        # Firma
+        director_ci = normalizar_cedula(institucion['director_ci'])
+        firma = f"________________________<br/>Prof. {institucion['director']}"
+        story.append(Paragraph(firma, centrado))
+        story.append(Spacer(1, 3))
+        story.append(Paragraph(f"C.I. {director_ci}", centrado))
+        story.append(Spacer(1, 3))
+        story.append(Paragraph("Director", centrado))
+
+        # Construir PDF
+        doc.build(story, onFirstPage=encabezado_y_pie, onLaterPages=encabezado_y_pie)
+        return nombre_archivo
+        
+    except Exception as e:
+        raise IOError(f"Error generando PDF: {e}")
+
+def generar_constancia_aceptacion(institucion: dict, anio_escolar: dict) -> str:
+    """Genera constancia de aceptacion en PDF."""
+    # Validar datos
+    campos_inst = ["director", "director_ci"]
+    valido, mensaje = validar_datos_exportacion(institucion, campos_inst)
+    if not valido:
+        raise ValueError(f"Datos de institución incompletos: {mensaje}")
+    
+    # Extraer años del año escolar
+    anio_inicio, anio_fin = extraer_anio_escolar(anio_escolar)
+    anio_inicio_form = formatear_anio(anio_inicio)
+    anio_fin_form = formatear_anio(anio_fin)
+    
+    # Fecha de expedición
+    fecha_hoy = date.today()
+    dia = fecha_hoy.day
+    mes_nombre = fecha_hoy.strftime("%B").upper()
+    meses = {
+        'JANUARY': 'ENERO', 'FEBRUARY': 'FEBRERO', 'MARCH': 'MARZO',
+        'APRIL': 'ABRIL', 'MAY': 'MAYO', 'JUNE': 'JUNIO',
+        'JULY': 'JULIO', 'AUGUST': 'AGOSTO', 'SEPTEMBER': 'SEPTIEMBRE',
+        'OCTOBER': 'OCTUBRE', 'NOVEMBER': 'NOVIEMBRE', 'DECEMBER': 'DICIEMBRE'
+    }
+    mes_es = meses.get(mes_nombre, mes_nombre)
+    anio = fecha_hoy.year
+
+    # Crear carpeta
+    carpeta = os.path.join(os.getcwd(), "exportados", "Constancias de aceptacion")
+    ok, msg = crear_carpeta_segura(carpeta)
+    if not ok:
+        raise IOError(msg)
+
+    nombre_base = sanitizar_nombre_archivo(f"Constancia_aceptacion_{fecha_hoy}")
+    nombre_archivo = os.path.join(carpeta, f"{nombre_base}.pdf")
+
+    try:
+        doc = SimpleDocTemplate(
+            nombre_archivo,
+            pagesize=letter,
+            leftMargin=80,
+            rightMargin=80,
+            topMargin=220,
+            bottomMargin=50
+        )
+
+        story = [Paragraph("CONSTANCIA DE ACEPTACIÓN", styles["Title"]), Spacer(1, 16)]
+
+        # Texto principal
+        texto = (
+            f"La Dirección del plantel hace constar mediante la presente, que el Ciudadano(a): _________________"
+            f"____________________________, titular de la Cédula de Identidad: V.-_______________,"
+            f"solicitó cupo en esta institución para su representado (a) el Estudiante: "
+            f"_______________________________________________, quien cursará el ______________________"
+            f", De Educación: _______________, "
+            f"para el Año Escolar: ________________. "
+            f"Siendo aceptado (a) su Solicitud la cual se hará efectiva una vez consignados "
+            f"los Documentos necesarios para tal fin."
+        )
+        story.append(Paragraph(texto, justificado))
+        story.append(Spacer(1, 40))
+
+        texto_fecha = f"Constancia que se expide a Solicitud de la parte interesada en <b>PUERTO LA CRUZ</b>, a los <b>{dia}</b> días del mes de <b>{mes_es}</b> de <b>{anio}</b>"
         story.append(Paragraph(texto_fecha, justificado))
         story.append(Spacer(1, 150))
 
