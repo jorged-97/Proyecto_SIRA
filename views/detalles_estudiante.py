@@ -19,6 +19,7 @@ from utils.exportar import (
     generar_constancia_aceptacion,
     generar_buena_conducta_retirado,
     generar_constancia_retiro, generar_historial_estudiante_pdf,
+    generar_constancia_retiro_retirado,
     generar_historial_notas_pdf, generar_certificado_promocion_sexto,
     generar_certificado_promocion_sexto_docx, generar_certificado_prosecucion_primaria
 )
@@ -139,7 +140,8 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
                                       self.exportar_certificado_promocion_sexto)
         menu_exportar_estu.addAction("Certificado promoción 6to a Secundaria (DOCX)",
                                       self.exportar_certificado_promocion_sexto_docx)
-        menu_exportar_estu.addAction("Constancia de retiro", self.exportar_constancia_retiro)
+        menu_exportar_estu.addAction("Constancia de retiro (normal)", self.exportar_constancia_retiro)
+        menu_exportar_estu.addAction("Constancia de retiro (grado anterior)", self.exportar_constancia_retiro_retirado)
         menu_exportar_estu.addSeparator()
         menu_exportar_estu.addAction("Exportar historial académico (PDF)", self.exportar_historial_pdf)
         menu_exportar_estu.addAction("Exportar historial de notas (PDF)", self.exportar_historial_notas_pdf)
@@ -528,7 +530,76 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
                 f"No se pudo generar la constancia: {e}",
                 QMessageBox.Icon.Critical
             ).exec()
-    
+
+    def exportar_constancia_retiro_retirado(self):
+        """Genera constancia de retiro mostrando el grado y año anterior al activo."""
+        # Verificar que el estudiante esté retirado
+        try:
+            datos_bd = EstudianteModel.obtener_por_id(self.id_estudiante)
+            if not datos_bd:
+                crear_msgbox(self, "Error", "No se encontró el estudiante.",
+                             QMessageBox.Icon.Critical).exec()
+                return
+            estatus_acad = str(datos_bd.get("estatus_academico", "")).strip()
+            estado_est = datos_bd.get("estado", 1)
+            if estatus_acad != "Retirado" and estado_est != 0:
+                crear_msgbox(
+                    self, "Estudiante no elegible",
+                    "La constancia de retiro (grado anterior) solo se puede generar "
+                    "para estudiantes con estatus académico 'Retirado'.",
+                    QMessageBox.Icon.Warning
+                ).exec()
+                return
+
+            # Obtener último grado cursado del historial (año anterior al activo)
+            historial = EstudianteModel.obtener_historial_estudiante(self.id_estudiante)
+            if not historial:
+                crear_msgbox(self, "Sin historial",
+                             "No se encontró historial académico para este estudiante.",
+                             QMessageBox.Icon.Warning).exec()
+                return
+            anio_activo_inicio = int(self.anio_escolar['año_inicio'])
+            ultimo_curso = None
+            for registro in historial:
+                if registro['año_inicio'] < anio_activo_inicio:
+                    ultimo_curso = registro
+                    break
+            if not ultimo_curso:
+                crear_msgbox(
+                    self, "Sin historial previo",
+                    "No se encontró un grado cursado y aprobado antes del año escolar activo.",
+                    QMessageBox.Icon.Warning
+                ).exec()
+                return
+
+            motivo_retiro = datos_bd.get("motivo_retiro")
+            estudiante_dict = self.obtener_estudiante_actual_dict()
+            estudiante_dict['Grado'] = ultimo_curso['grado']
+            estudiante_dict['Sección'] = ultimo_curso['letra']
+            estudiante_dict['Ciudad'] = datos_bd.get("ciudad", "")
+            estudiante_dict['Fecha Nac.'] = datos_bd.get("fecha_nac", "")
+            estudiante_dict['Género'] = datos_bd.get("genero", "")
+            estudiante_dict['Tipo Educ.'] = datos_bd.get("tipo_educacion", "")
+
+            institucion = InstitucionModel.obtener_por_id(1)
+            archivo = generar_constancia_retiro_retirado(
+                estudiante_dict, institucion, ultimo_curso['año_escolar'], motivo_retiro
+            )
+
+            crear_msgbox(
+                self, "Éxito",
+                f"Constancia de retiro (grado anterior) generada:\n{archivo}",
+                QMessageBox.Icon.Information
+            ).exec()
+            abrir_archivo(archivo)
+
+        except Exception as e:
+            crear_msgbox(
+                self, "Error",
+                f"No se pudo generar la constancia: {e}",
+                QMessageBox.Icon.Critical
+            ).exec()
+
     def aplicar_sombras(self):
         """Aplica sombras a los elementos de la interfaz."""
         crear_sombra_flotante(self.btnModificar_ficha_estu)

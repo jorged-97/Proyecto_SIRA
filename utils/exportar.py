@@ -2492,6 +2492,158 @@ def generar_constancia_retiro(estudiante: dict, institucion: dict, anio_escolar:
         raise IOError(f"Error generando PDF: {e}")
 
 
+def generar_constancia_retiro_retirado(estudiante: dict, institucion: dict, anio_escolar_egreso: str, motivo_retiro: str = None) -> str:
+    """Genera constancia de retiro en PDF para un estudiante retirado.
+    
+    A diferencia de generar_constancia_retiro, muestra el último grado cursado y
+    el año escolar en que lo cursó (el año anterior al año activo), en lugar del
+    grado/año en curso.
+    """
+    # Mapear campos de BD a formato esperado (compatible con ambos formatos)
+    estudiante_norm = {
+        "Nombres": estudiante.get("Nombres") or estudiante.get("nombres", ""),
+        "Apellidos": estudiante.get("Apellidos") or estudiante.get("apellidos", ""),
+        "Cédula": estudiante.get("Cédula") or estudiante.get("cedula", ""),
+        "Grado": estudiante.get("Grado") or estudiante.get("grado") or estudiante.get("ultimo_grado", ""),
+        "Sección": estudiante.get("Sección") or estudiante.get("seccion") or estudiante.get("letra", ""),
+        "Ciudad": estudiante.get("Ciudad") or estudiante.get("ciudad", ""),
+        "Fecha Nac.": estudiante.get("Fecha Nac.") or estudiante.get("fecha_nac", ""),
+        "Género": estudiante.get("Género") or estudiante.get("genero", ""),
+        "Tipo Educ.": estudiante.get("Tipo Educ.") or estudiante.get("tipo_educacion", ""),
+    }
+
+    # Validar datos
+    campos_est = ["Nombres", "Apellidos", "Cédula", "Grado", "Ciudad", "Fecha Nac."]
+    valido, mensaje = validar_datos_exportacion(estudiante_norm, campos_est)
+    if not valido:
+        raise ValueError(f"Datos de estudiante incompletos: {mensaje}")
+    
+    campos_inst = ["director", "director_ci", "nombre"]
+    valido, mensaje = validar_datos_exportacion(institucion, campos_inst)
+    if not valido:
+        raise ValueError(f"Datos de institución incompletos: {mensaje}")
+    
+    if not anio_escolar_egreso:
+        raise ValueError("Año escolar de egreso no proporcionado")
+    
+    # Normalizar datos
+    estudiante_norm["Nombres"] = str(estudiante_norm["Nombres"]).strip().upper()
+    estudiante_norm["Apellidos"] = str(estudiante_norm["Apellidos"]).strip().upper()
+    estudiante_norm["Cédula"] = normalizar_cedula(estudiante_norm["Cédula"], es_estudiante=True)
+
+    # Convertir fecha
+    fecha_nac_str = convertir_fecha_string(estudiante_norm['Fecha Nac.'])
+    
+    # Calcular edad
+    try:
+        if isinstance(estudiante_norm['Fecha Nac.'], (date, datetime)):
+            edad = calcular_edad(estudiante_norm['Fecha Nac.'])
+        else:
+            fecha_obj = datetime.strptime(str(estudiante_norm['Fecha Nac.']), "%d-%m-%Y").date()
+            edad = calcular_edad(fecha_obj)
+    except (ValueError, TypeError, KeyError):
+        edad = "N/A"
+    
+    # Motivo por defecto si no se proporciona
+    if not motivo_retiro:
+        motivo_retiro = "es retirado de la institución a solicitud de su representante siendo Promovido al siguiente grado"
+
+    # Extraer año escolar (formato: "2023/2024" -> "2023-2024")
+    anio_periodo = str(anio_escolar_egreso).replace('/', '-')
+    anios = anio_periodo.split('-')
+    if len(anios) == 2:
+        try:
+            anio_inicio_egreso = int(anios[0].strip())
+            anio_fin_egreso = int(anios[1].strip())
+            anio_periodo_form = f"{formatear_anio(anio_inicio_egreso)}-{formatear_anio(anio_fin_egreso)}"
+        except ValueError:
+            anio_periodo_form = anio_periodo
+    else:
+        anio_periodo_form = anio_periodo
+
+    # Crear carpeta
+    carpeta = os.path.join(os.getcwd(), "exportados", "Constancias de retiro")
+    ok, msg = crear_carpeta_segura(carpeta)
+    if not ok:
+        raise IOError(msg)
+
+    nombre_base = sanitizar_nombre_archivo(f"Constancia_retiro_{estudiante_norm['Cédula']}")
+    nombre_archivo = os.path.join(carpeta, f"{nombre_base}.pdf")
+
+    try:
+        doc = SimpleDocTemplate(
+            nombre_archivo,
+            pagesize=letter,
+            leftMargin=80,
+            rightMargin=80,
+            topMargin=220,
+            bottomMargin=50
+        )
+
+        story = [Paragraph("CONSTANCIA DE RETIRO", styles["Title"]), Spacer(1, 20)]
+
+        # Texto principal
+        director_ci = normalizar_cedula(institucion['director_ci'])
+        
+        # Determinar género para el artículo
+        genero = str(estudiante_norm.get("Género", "")).lower()
+        articulo = "el" if genero == "masculino" else "la"
+        
+        # Determinar si es nivel (Inicial) o grado (Primaria)
+        tipo_educacion = str(estudiante_norm.get("Tipo Educ.", "")).lower()
+        if "inicial" in tipo_educacion:
+            grado_texto = f"{estudiante_norm['Grado']}"
+        else:
+            grado_texto = f"{estudiante_norm['Grado']} grado"
+            
+        texto = (
+            f"La Dirección del plantel hace constar mediante la presente, que {articulo} Alumno(a): "
+            f"<b>{estudiante_norm['Apellidos']} {estudiante_norm['Nombres']}</b>, "
+            f"nacido(a) en <b>{estudiante_norm['Ciudad'].upper()}</b> él <b>{fecha_nac_str}</b> "
+            f"y de <b>{edad} año(s)</b> de edad, estudiante regular del <b>{grado_texto}</b> "
+            f"para el año escolar <b>{anio_periodo_form}</b>, {motivo_retiro}.<br/><br/>"
+        )
+        story.append(Paragraph(texto, justificado))
+        story.append(Spacer(1, 20))
+
+        # Fecha actual
+        fecha_hoy = date.today()
+        dia = fecha_hoy.day
+        mes_nombre = fecha_hoy.strftime("%B").upper()
+        
+        # Traducir mes al español
+        meses = {
+            'JANUARY': 'ENERO', 'FEBRUARY': 'FEBRERO', 'MARCH': 'MARZO',
+            'APRIL': 'ABRIL', 'MAY': 'MAYO', 'JUNE': 'JUNIO',
+            'JULY': 'JULIO', 'AUGUST': 'AGOSTO', 'SEPTEMBER': 'SEPTIEMBRE',
+            'OCTOBER': 'OCTUBRE', 'NOVEMBER': 'NOVIEMBRE', 'DECEMBER': 'DICIEMBRE'
+        }
+        mes_es = meses.get(mes_nombre, mes_nombre)
+        anio = fecha_hoy.year
+        
+        texto_fecha = (
+            f"Se expide constancia a solicitud de la parte interesada en Puerto La Cruz "
+            f"a los <b>{dia}</b> días del mes de <b>{mes_es}</b> del año <b>{anio}</b>."
+        )
+        story.append(Paragraph(texto_fecha, justificado))
+        story.append(Spacer(1, 150))
+
+        # Firma
+        firma_texto = f"________________________<br/>Prof. {institucion['director']}"
+        story.append(Paragraph(firma_texto, centrado))
+        story.append(Spacer(1, 3))
+        story.append(Paragraph(f"C.I. {director_ci}", centrado))
+        story.append(Spacer(1, 3))
+        story.append(Paragraph("Director", centrado))
+
+        # Construir PDF
+        doc.build(story, onFirstPage=encabezado_y_pie, onLaterPages=encabezado_y_pie)
+        return nombre_archivo
+        
+    except Exception as e:
+        raise IOError(f"Error generando PDF: {e}")
+
+
 def generar_historial_estudiante_pdf(estudiante: dict, historial: list) -> str:
     """Genera un PDF con el historial académico completo del estudiante."""
     # Validar datos

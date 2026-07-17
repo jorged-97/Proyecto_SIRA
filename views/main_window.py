@@ -18,6 +18,7 @@ from utils.exportar import (
     generar_constancia_aceptacion,
     generar_buena_conducta_retirado,
     generar_constancia_trabajo, generar_constancia_retiro,
+    generar_constancia_retiro_retirado,
     generar_historial_estudiante_pdf, generar_historial_notas_pdf,
     generar_certificado_promocion_sexto,
     generar_certificado_promocion_sexto_docx, generar_certificado_prosecucion_primaria, 
@@ -301,7 +302,8 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             "Certif. de prosecución primaria",
             "Certif. promoción 6to a Secundaria",
             "Certif. promoción 6to a Secundaria (DOCX)",
-            "Constancia de retiro",
+            "Constancia de retiro (normal)",
+            "Constancia de retiro (grado anterior)",
             "Historial académico",
             "Historial de notas",
         ]
@@ -1279,7 +1281,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
                         f"{anio_inicio}/{anio_inicio + 1}"
                     )
 
-                elif constancia == "Constancia de retiro":
+                elif constancia == "Constancia de retiro (normal)":
                     if datos_bd.get("estado", 1) == 1:
                         crear_msgbox(self, "Estudiante activo",
                                      "La constancia de retiro solo se puede generar para estudiantes retirados (inactivos).",
@@ -1287,6 +1289,53 @@ class MainWindow(QMainWindow, UiMainWindowBase):
                         return
                     motivo_retiro = datos_bd.get("motivo_retiro")
                     archivo = generar_constancia_retiro(estudiante, institucion, self.anio_escolar, motivo_retiro)
+
+                elif constancia == "Constancia de retiro (grado anterior)":
+                    # Solo para estudiantes retirados
+                    estatus_acad = str(datos_bd.get("estatus_academico", "")).strip()
+                    estado_est = datos_bd.get("estado", 1)
+                    if estatus_acad != "Retirado" and estado_est != 0:
+                        crear_msgbox(
+                            self,
+                            "Estudiante no elegible",
+                            "La constancia de retiro (grado anterior) solo se puede generar "
+                            "para estudiantes con estatus académico 'Retirado'.",
+                            QMessageBox.Icon.Warning
+                        ).exec()
+                        return
+                    historial = EstudianteModel.obtener_historial_estudiante(persona_id)
+                    if not historial:
+                        crear_msgbox(
+                            self, "Sin historial",
+                            "No se encontró historial académico para este estudiante.",
+                            QMessageBox.Icon.Warning
+                        ).exec()
+                        return
+                    # Buscar el último curso anterior al año escolar activo
+                    # (el año que realmente cursó y aprobó, no el recién aperturado)
+                    anio_activo_inicio = int(self.anio_escolar['año_inicio'])
+                    ultimo_curso = None
+                    for registro in historial:
+                        if registro['año_inicio'] < anio_activo_inicio:
+                            ultimo_curso = registro
+                            break
+                    if not ultimo_curso:
+                        crear_msgbox(
+                            self, "Sin historial previo",
+                            "No se encontró un grado cursado y aprobado antes del año escolar activo.",
+                            QMessageBox.Icon.Warning
+                        ).exec()
+                        return
+                    motivo_retiro = datos_bd.get("motivo_retiro")
+                    estudiante['Grado'] = ultimo_curso['grado']
+                    estudiante['Sección'] = ultimo_curso['letra']
+                    estudiante['Ciudad'] = datos_bd.get("ciudad", "")
+                    estudiante['Fecha Nac.'] = datos_bd.get("fecha_nac", "")
+                    estudiante['Género'] = datos_bd.get("genero", "")
+                    estudiante['Tipo Educ.'] = datos_bd.get("tipo_educacion", "")
+                    archivo = generar_constancia_retiro_retirado(
+                        estudiante, institucion, ultimo_curso['año_escolar'], motivo_retiro
+                    )
 
                 elif constancia == "Historial académico":
                     historial = EstudianteModel.obtener_historial_estudiante(persona_id)
