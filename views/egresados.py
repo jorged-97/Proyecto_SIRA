@@ -6,6 +6,7 @@ from models.estu_model import EstudianteModel
 from models.institucion_model import InstitucionModel
 from utils.exportar import (
     generar_buena_conducta,
+    generar_buena_conducta_egresado,
     exportar_tabla_excel,
     generar_certificado_promocion_sexto,
     generar_certificado_promocion_sexto_docx
@@ -71,7 +72,8 @@ class Egresados(QWidget):
         # Configurar menú de exportación
         self.btnExportar_egresados.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         menu_exportar = QMenu(self.btnExportar_egresados)
-        menu_exportar.addAction("Constancia de buena conducta", self.exportar_buena_conducta)
+        #menu_exportar.addAction("Constancia de buena conducta", self.exportar_buena_conducta)
+        menu_exportar.addAction("Constancia de buena conducta (egresado)", self.exportar_buena_conducta_egresado)
         menu_exportar.addAction("Certificado promoción 6to a Secundaria", self.exportar_certificado_promocion_sexto)
         menu_exportar.addAction("Certificado promoción 6to a Secundaria (DOCX)", self.exportar_certificado_promocion_sexto_docx)
         menu_exportar.addAction("Exportar tabla filtrada a Excel", self.exportar_excel_egresados)
@@ -390,6 +392,92 @@ class Egresados(QWidget):
                 QMessageBox.Icon.Information
             ).exec()
             
+            # Abrir archivo
+            abrir_archivo(archivo)
+
+        except Exception as e:
+            crear_msgbox(
+                self,
+                "Error",
+                f"No se pudo generar la constancia: {e}",
+                QMessageBox.Icon.Critical
+            ).exec()
+
+    def exportar_buena_conducta_egresado(self):
+        """
+        Genera constancia de buena conducta para el estudiante egresado seleccionado,
+        mostrando el último grado cursado y el año escolar en que lo cursó.
+        """
+        estudiante = self.obtener_estudiante_seleccionado()
+
+        if not estudiante:
+            crear_msgbox(
+                self,
+                "Selección requerida",
+                "Debe seleccionar un estudiante de la tabla.",
+                QMessageBox.Icon.Warning
+            ).exec()
+            return
+
+        try:
+            # Verificar que sea egresado
+            if estudiante.get("estatus_academico") != "Egresado":
+                crear_msgbox(
+                    self,
+                    "Estudiante no válido",
+                    "El estudiante seleccionado no está marcado como egresado.",
+                    QMessageBox.Icon.Warning
+                ).exec()
+                return
+
+            # Obtener ID del estudiante
+            id_estudiante = estudiante['id']
+
+            # Obtener historial académico
+            historial = EstudianteModel.obtener_historial_estudiante(id_estudiante)
+
+            if not historial:
+                crear_msgbox(
+                    self,
+                    "Sin historial",
+                    "No se encontró historial académico para este estudiante.",
+                    QMessageBox.Icon.Warning
+                ).exec()
+                return
+
+            # El historial viene ordenado DESC por año_inicio: el primero es el más reciente
+            ultimo_curso = historial[0]
+
+            # Preparar datos del último grado cursado
+            estudiante['Grado'] = ultimo_curso['grado']
+            estudiante['Sección'] = ultimo_curso['letra']
+
+            # Obtener datos de la institución
+            institucion = InstitucionModel.obtener_por_id(1)
+
+            if not institucion:
+                crear_msgbox(
+                    self,
+                    "Error",
+                    "No se encontraron datos de la institución.",
+                    QMessageBox.Icon.Critical
+                ).exec()
+                return
+
+            # Generar constancia usando el año escolar del último curso cursado
+            archivo = generar_buena_conducta_egresado(
+                estudiante,
+                institucion,
+                ultimo_curso['año_escolar']
+            )
+
+            crear_msgbox(
+                self,
+                "Éxito",
+                f"Constancia generada correctamente:\n{archivo}",
+                QMessageBox.Icon.Information
+            ).exec()
+
             # Abrir archivo
             abrir_archivo(archivo)
 

@@ -1060,6 +1060,232 @@ def generar_buena_conducta(estudiante: dict, institucion: dict, anio_escolar: di
         raise IOError(f"Error generando PDF: {e}")
 
 
+def generar_buena_conducta_egresado(estudiante: dict, institucion: dict, anio_escolar_egreso: str) -> str:
+    """Genera constancia de buena conducta en PDF para un estudiante egresado."""
+    # Mapear campos de BD a formato esperado (compatible con ambos formatos)
+    estudiante_norm = {
+        "Nombres": estudiante.get("Nombres") or estudiante.get("nombres", ""),
+        "Apellidos": estudiante.get("Apellidos") or estudiante.get("apellidos", ""),
+        "Cédula": estudiante.get("Cédula") or estudiante.get("cedula", ""),
+        "Grado": estudiante.get("Grado") or estudiante.get("grado") or estudiante.get("ultimo_grado", ""),
+        "Sección": estudiante.get("Sección") or estudiante.get("seccion") or estudiante.get("letra", ""),
+    }
+
+    # Validar datos
+    campos_est = ["Nombres", "Apellidos", "Cédula", "Grado", "Sección"]
+    valido, mensaje = validar_datos_exportacion(estudiante_norm, campos_est)
+    if not valido:
+        raise ValueError(f"Datos de estudiante incompletos: {mensaje}")
+    
+    campos_inst = ["director", "director_ci", "nombre"]
+    valido, mensaje = validar_datos_exportacion(institucion, campos_inst)
+    if not valido:
+        raise ValueError(f"Datos de institución incompletos: {mensaje}")
+    
+    if not anio_escolar_egreso:
+        raise ValueError("Año escolar de egreso no proporcionado")
+    
+    # Normalizar datos
+    estudiante_norm["Nombres"] = str(estudiante_norm["Nombres"]).strip().upper()
+    estudiante_norm["Apellidos"] = str(estudiante_norm["Apellidos"]).strip().upper()
+    cedula_normalizada = normalizar_cedula(estudiante_norm["Cédula"], es_estudiante=True)
+
+    # Extraer año escolar (formato: "2023/2024" -> "2023-2024")
+    anio_periodo = str(anio_escolar_egreso).replace('/', '-')
+    anios = anio_periodo.split('-')
+    if len(anios) == 2:
+        try:
+            anio_inicio_egreso = int(anios[0].strip())
+            anio_fin_egreso = int(anios[1].strip())
+            anio_periodo_form = f"{formatear_anio(anio_inicio_egreso)}-{formatear_anio(anio_fin_egreso)}"
+        except ValueError:
+            anio_periodo_form = anio_periodo
+    else:
+        anio_periodo_form = anio_periodo
+
+    # Crear carpeta
+    carpeta = os.path.join(os.getcwd(), "exportados", "Constancias de buena conducta")
+    ok, msg = crear_carpeta_segura(carpeta)
+    if not ok:
+        raise IOError(msg)
+
+    nombre_base = sanitizar_nombre_archivo(f"Constancia_buena_conducta_{estudiante_norm['Cédula']}")
+    nombre_archivo = os.path.join(carpeta, f"{nombre_base}.pdf")
+
+    try:
+        doc = SimpleDocTemplate(
+            nombre_archivo,
+            pagesize=letter,
+            leftMargin=80,
+            rightMargin=80,
+            topMargin=220,
+            bottomMargin=50
+        )
+
+        story = [Paragraph("CONSTANCIA DE BUENA CONDUCTA", styles["Title"]), Spacer(1, 16)]
+
+        # Texto principal
+        director_ci = normalizar_cedula(institucion['director_ci'])
+        texto = (
+            f"El suscrito, Director <b>PROF. {institucion['director'].upper()}</b>, portador de la Cédula de Identidad "
+            f"<b>{director_ci}</b>, de la {institucion['nombre']}, que funciona en Puerto La Cruz, "
+            f"hace constar que el alumno(a): <b>{estudiante_norm['Apellidos']} {estudiante_norm['Nombres']}</b>, "
+            f"portador de la cédula de identidad <b>{cedula_normalizada}</b>, estudiante del "
+            f"<b>{estudiante_norm['Grado']} Grado Sección '{estudiante_norm['Sección']}'</b> "
+            f"de Educación Primaria durante el Año Escolar <b>{anio_periodo_form}</b>, mantuvo una "
+            f"<b>Buena Conducta</b> durante su permanencia en esta institución educativa.<br/><br/>"
+        )
+        story.append(Paragraph(texto, justificado))
+        story.append(Spacer(1, 40))
+
+        # Fecha de expedición
+        fecha_hoy = date.today()
+        dia = fecha_hoy.day
+        mes_nombre = fecha_hoy.strftime("%B").upper()
+        meses = {
+            'JANUARY': 'ENERO', 'FEBRUARY': 'FEBRERO', 'MARCH': 'MARZO',
+            'APRIL': 'ABRIL', 'MAY': 'MAYO', 'JUNE': 'JUNIO',
+            'JULY': 'JULIO', 'AUGUST': 'AGOSTO', 'SEPTEMBER': 'SEPTIEMBRE',
+            'OCTOBER': 'OCTUBRE', 'NOVEMBER': 'NOVIEMBRE', 'DECEMBER': 'DICIEMBRE'
+        }
+        mes_es = meses.get(mes_nombre, mes_nombre)
+        anio = fecha_hoy.year
+        
+        texto_fecha = f"Certificado que se expide en <b>PUERTO LA CRUZ</b>, a los <b>{dia}</b> días del mes de <b>{mes_es}</b> de <b>{anio}</b>"
+        story.append(Paragraph(texto_fecha, justificado))
+        story.append(Spacer(1, 150))
+
+        # Firma
+        firma = f"________________________<br/>Prof. {institucion['director']}"
+        story.append(Paragraph(firma, centrado))
+        story.append(Spacer(1, 3))
+        story.append(Paragraph(f"C.I. {director_ci}", centrado))
+        story.append(Spacer(1, 3))
+        story.append(Paragraph("Director", centrado))
+
+        # Construir PDF
+        doc.build(story, onFirstPage=encabezado_y_pie, onLaterPages=encabezado_y_pie)
+        return nombre_archivo
+        
+    except Exception as e:
+        raise IOError(f"Error generando PDF: {e}")
+
+
+def generar_buena_conducta_retirado(estudiante: dict, institucion: dict, anio_escolar_egreso: str) -> str:
+    """Genera constancia de buena conducta en PDF para un estudiante retirado.
+    
+    Muestra el último grado cursado y el año escolar en que lo cursó (el año
+    anterior al año activo).
+    """
+    # Mapear campos de BD a formato esperado (compatible con ambos formatos)
+    estudiante_norm = {
+        "Nombres": estudiante.get("Nombres") or estudiante.get("nombres", ""),
+        "Apellidos": estudiante.get("Apellidos") or estudiante.get("apellidos", ""),
+        "Cédula": estudiante.get("Cédula") or estudiante.get("cedula", ""),
+        "Grado": estudiante.get("Grado") or estudiante.get("grado") or estudiante.get("ultimo_grado", ""),
+        "Sección": estudiante.get("Sección") or estudiante.get("seccion") or estudiante.get("letra", ""),
+    }
+
+    # Validar datos
+    campos_est = ["Nombres", "Apellidos", "Cédula", "Grado", "Sección"]
+    valido, mensaje = validar_datos_exportacion(estudiante_norm, campos_est)
+    if not valido:
+        raise ValueError(f"Datos de estudiante incompletos: {mensaje}")
+    
+    campos_inst = ["director", "director_ci", "nombre"]
+    valido, mensaje = validar_datos_exportacion(institucion, campos_inst)
+    if not valido:
+        raise ValueError(f"Datos de institución incompletos: {mensaje}")
+    
+    if not anio_escolar_egreso:
+        raise ValueError("Año escolar de egreso no proporcionado")
+    
+    # Normalizar datos
+    estudiante_norm["Nombres"] = str(estudiante_norm["Nombres"]).strip().upper()
+    estudiante_norm["Apellidos"] = str(estudiante_norm["Apellidos"]).strip().upper()
+    cedula_normalizada = normalizar_cedula(estudiante_norm["Cédula"], es_estudiante=True)
+
+    # Extraer año escolar (formato: "2023/2024" -> "2023-2024")
+    anio_periodo = str(anio_escolar_egreso).replace('/', '-')
+    anios = anio_periodo.split('-')
+    if len(anios) == 2:
+        try:
+            anio_inicio_egreso = int(anios[0].strip())
+            anio_fin_egreso = int(anios[1].strip())
+            anio_periodo_form = f"{formatear_anio(anio_inicio_egreso)}-{formatear_anio(anio_fin_egreso)}"
+        except ValueError:
+            anio_periodo_form = anio_periodo
+    else:
+        anio_periodo_form = anio_periodo
+
+    # Crear carpeta (misma carpeta que las demás constancias de buena conducta)
+    carpeta = os.path.join(os.getcwd(), "exportados", "Constancias de buena conducta")
+    ok, msg = crear_carpeta_segura(carpeta)
+    if not ok:
+        raise IOError(msg)
+
+    nombre_base = sanitizar_nombre_archivo(f"Constancia_buena_conducta_{estudiante_norm['Cédula']}")
+    nombre_archivo = os.path.join(carpeta, f"{nombre_base}.pdf")
+
+    try:
+        doc = SimpleDocTemplate(
+            nombre_archivo,
+            pagesize=letter,
+            leftMargin=80,
+            rightMargin=80,
+            topMargin=220,
+            bottomMargin=50
+        )
+
+        story = [Paragraph("CONSTANCIA DE BUENA CONDUCTA", styles["Title"]), Spacer(1, 16)]
+
+        # Texto principal
+        director_ci = normalizar_cedula(institucion['director_ci'])
+        texto = (
+            f"El suscrito, Director <b>PROF. {institucion['director'].upper()}</b>, portador de la Cédula de Identidad "
+            f"<b>{director_ci}</b>, de la {institucion['nombre']}, que funciona en Puerto La Cruz, "
+            f"hace constar que el alumno(a): <b>{estudiante_norm['Apellidos']} {estudiante_norm['Nombres']}</b>, "
+            f"portador de la cédula de identidad <b>{cedula_normalizada}</b>, cursó y aprobó el "
+            f"<b>{estudiante_norm['Grado']} Grado Sección '{estudiante_norm['Sección']}'</b> "
+            f"de Educación Primaria durante el Año Escolar <b>{anio_periodo_form}</b>, demostrando una "
+            f"<b>Buena Conducta</b> durante su permanencia en esta institución educativa.<br/><br/>"
+        )
+        story.append(Paragraph(texto, justificado))
+        story.append(Spacer(1, 40))
+
+        # Fecha de expedición
+        fecha_hoy = date.today()
+        dia = fecha_hoy.day
+        mes_nombre = fecha_hoy.strftime("%B").upper()
+        meses = {
+            'JANUARY': 'ENERO', 'FEBRUARY': 'FEBRERO', 'MARCH': 'MARZO',
+            'APRIL': 'ABRIL', 'MAY': 'MAYO', 'JUNE': 'JUNIO',
+            'JULY': 'JULIO', 'AUGUST': 'AGOSTO', 'SEPTEMBER': 'SEPTIEMBRE',
+            'OCTOBER': 'OCTUBRE', 'NOVEMBER': 'NOVIEMBRE', 'DECEMBER': 'DICIEMBRE'
+        }
+        mes_es = meses.get(mes_nombre, mes_nombre)
+        anio = fecha_hoy.year
+        
+        texto_fecha = f"Certificado que se expide en <b>PUERTO LA CRUZ</b>, a los <b>{dia}</b> días del mes de <b>{mes_es}</b> de <b>{anio}</b>"
+        story.append(Paragraph(texto_fecha, justificado))
+        story.append(Spacer(1, 150))
+
+        # Firma
+        firma = f"________________________<br/>Prof. {institucion['director']}"
+        story.append(Paragraph(firma, centrado))
+        story.append(Spacer(1, 3))
+        story.append(Paragraph(f"C.I. {director_ci}", centrado))
+        story.append(Spacer(1, 3))
+        story.append(Paragraph("Director", centrado))
+
+        # Construir PDF
+        doc.build(story, onFirstPage=encabezado_y_pie, onLaterPages=encabezado_y_pie)
+        return nombre_archivo
+        
+    except Exception as e:
+        raise IOError(f"Error generando PDF: {e}")
+
+
 def generar_constancia_inscripcion(estudiante: dict, institucion: dict) -> str:
     """Genera constancia de inscripción en PDF para un estudiante."""
     # Validar datos

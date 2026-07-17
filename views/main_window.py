@@ -16,6 +16,7 @@ from utils.exportar import (
     generar_constancia_estudios, generar_constancia_estudios_docx, generar_buena_conducta,
     generar_constancia_inscripcion, generar_constancia_prosecucion_inicial,
     generar_constancia_aceptacion,
+    generar_buena_conducta_retirado,
     generar_constancia_trabajo, generar_constancia_retiro,
     generar_historial_estudiante_pdf, generar_historial_notas_pdf,
     generar_certificado_promocion_sexto,
@@ -295,6 +296,7 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             "Constancia de inscripción",
             "Constancia de aceptación",
             "Constancia de buena conducta",
+            "Constancia de buena conducta (retirado)",
             "Constancia de prosecución inicial",
             "Certif. de prosecución primaria",
             "Certif. promoción 6to a Secundaria",
@@ -1138,6 +1140,48 @@ class MainWindow(QMainWindow, UiMainWindowBase):
 
                 elif constancia == "Constancia de buena conducta":
                     archivo = generar_buena_conducta(estudiante, institucion, self.anio_escolar)
+
+                elif constancia == "Constancia de buena conducta (retirado)":
+                    # Solo para estudiantes retirados
+                    estatus_acad = str(datos_bd.get("estatus_academico", "")).strip()
+                    estado_est = datos_bd.get("estado", 1)
+                    if estatus_acad != "Retirado" and estado_est != 0:
+                        crear_msgbox(
+                            self,
+                            "Estudiante no elegible",
+                            "La constancia de buena conducta (retirado) solo se puede generar "
+                            "para estudiantes con estatus académico 'Retirado'.",
+                            QMessageBox.Icon.Warning
+                        ).exec()
+                        return
+                    historial = EstudianteModel.obtener_historial_estudiante(persona_id)
+                    if not historial:
+                        crear_msgbox(
+                            self, "Sin historial",
+                            "No se encontró historial académico para este estudiante.",
+                            QMessageBox.Icon.Warning
+                        ).exec()
+                        return
+                    # Buscar el último curso anterior al año escolar activo
+                    # (el año que realmente cursó y aprobó, no el recién aperturado)
+                    anio_activo_inicio = int(self.anio_escolar['año_inicio'])
+                    ultimo_curso = None
+                    for registro in historial:
+                        if registro['año_inicio'] < anio_activo_inicio:
+                            ultimo_curso = registro
+                            break
+                    if not ultimo_curso:
+                        crear_msgbox(
+                            self, "Sin historial previo",
+                            "No se encontró un grado cursado y aprobado antes del año escolar activo.",
+                            QMessageBox.Icon.Warning
+                        ).exec()
+                        return
+                    estudiante['Grado'] = ultimo_curso['grado']
+                    estudiante['Sección'] = ultimo_curso['letra']
+                    archivo = generar_buena_conducta_retirado(
+                        estudiante, institucion, ultimo_curso['año_escolar']
+                    )
                 
                 elif constancia == "Certif. de prosecución primaria":
                     archivo = generar_certificado_prosecucion_primaria(estudiante, institucion, self.anio_escolar)

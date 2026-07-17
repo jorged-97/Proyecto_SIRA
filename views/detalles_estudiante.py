@@ -17,6 +17,7 @@ from utils.exportar import (
     generar_constancia_estudios, generar_constancia_estudios_docx, generar_buena_conducta,
     generar_constancia_inscripcion, generar_constancia_prosecucion_inicial,
     generar_constancia_aceptacion,
+    generar_buena_conducta_retirado,
     generar_constancia_retiro, generar_historial_estudiante_pdf,
     generar_historial_notas_pdf, generar_certificado_promocion_sexto,
     generar_certificado_promocion_sexto_docx, generar_certificado_prosecucion_primaria
@@ -128,6 +129,7 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
         menu_exportar_estu.addAction("Constancia de estudios (PDF)", self.exportar_constancia_estudios)
         menu_exportar_estu.addAction("Constancia de estudios (DOCX)", self.exportar_constancia_estudios_docx)
         menu_exportar_estu.addAction("Constancia de buena conducta", self.exportar_buena_conducta)
+        menu_exportar_estu.addAction("Constancia de buena conducta (retirado)", self.exportar_buena_conducta_retirado)
         menu_exportar_estu.addAction("Constancia de inscripción", self.exportar_constancia_inscripcion)
         menu_exportar_estu.addAction("Constancia de aceptación", self.exportar_constancia_aceptacion)
         menu_exportar_estu.addAction("Constancia prosecución Educación Inicial", 
@@ -225,6 +227,62 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
             institucion = InstitucionModel.obtener_por_id(1)
             archivo = generar_buena_conducta(estudiante, institucion, self.anio_escolar)
             crear_msgbox(self, "Éxito", f"Constancia generada:\n{archivo}", QMessageBox.Icon.Information).exec()
+            abrir_archivo(archivo)
+        except Exception as e:
+            crear_msgbox(self, "Error", f"No se pudo generar:\n{e}", QMessageBox.Icon.Critical).exec()
+
+    def exportar_buena_conducta_retirado(self):
+        """Genera constancia de buena conducta para estudiante retirado (año anterior)."""
+        try:
+            # Verificar que el estudiante esté retirado
+            datos_bd = EstudianteModel.obtener_por_id(self.id_estudiante)
+            if not datos_bd:
+                crear_msgbox(self, "Error", "No se encontró el estudiante.", QMessageBox.Icon.Critical).exec()
+                return
+            estatus_acad = str(datos_bd.get("estatus_academico", "")).strip()
+            estado_est = datos_bd.get("estado", 1)
+            if estatus_acad != "Retirado" and estado_est != 0:
+                crear_msgbox(
+                    self, "Estudiante no elegible",
+                    "La constancia de buena conducta (retirado) solo se puede generar "
+                    "para estudiantes con estatus académico 'Retirado'.",
+                    QMessageBox.Icon.Warning
+                ).exec()
+                return
+
+            # Obtener último grado cursado del historial (año anterior)
+            historial = EstudianteModel.obtener_historial_estudiante(self.id_estudiante)
+            if not historial:
+                crear_msgbox(self, "Sin historial",
+                             "No se encontró historial académico para este estudiante.",
+                             QMessageBox.Icon.Warning).exec()
+                return
+            # Buscar el último curso anterior al año escolar activo
+            # (el año que realmente cursó y aprobó, no el recién aperturado)
+            anio_activo_inicio = int(self.anio_escolar['año_inicio'])
+            ultimo_curso = None
+            for registro in historial:
+                if registro['año_inicio'] < anio_activo_inicio:
+                    ultimo_curso = registro
+                    break
+            if not ultimo_curso:
+                crear_msgbox(
+                    self, "Sin historial previo",
+                    "No se encontró un grado cursado y aprobado antes del año escolar activo.",
+                    QMessageBox.Icon.Warning
+                ).exec()
+                return
+
+            estudiante = self.obtener_estudiante_actual_dict()
+            estudiante['Grado'] = ultimo_curso['grado']
+            estudiante['Sección'] = ultimo_curso['letra']
+
+            institucion = InstitucionModel.obtener_por_id(1)
+            archivo = generar_buena_conducta_retirado(
+                estudiante, institucion, ultimo_curso['año_escolar']
+            )
+            crear_msgbox(self, "Éxito", f"Constancia generada:\n{archivo}",
+                         QMessageBox.Icon.Information).exec()
             abrir_archivo(archivo)
         except Exception as e:
             crear_msgbox(self, "Error", f"No se pudo generar:\n{e}", QMessageBox.Icon.Critical).exec()
