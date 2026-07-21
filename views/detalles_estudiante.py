@@ -967,7 +967,7 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
             self.lneCedula_padre_ficha_estu, self.lneOcup_padre_ficha_estu, 
             self.lneApellidos_repre_ficha_estu, self.lneNombres_repre_ficha_estu, 
             self.lneFechaNac_repre_ficha_estu, self.cbxGenero_repre_ficha_estu, 
-            self.lneDir_repre_ficha_estu, self.lneNum_repre_ficha_estu, 
+            self.lneDir_repre_ficha_estu, self.lneNum_repre_ficha_estu, self.lneFechaIng_ficha_estu,
             self.lneCorreo_repre_ficha_estu, self.lneObser_ficha_estu_repre,
         ]
         
@@ -976,7 +976,6 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
             self.lneEdad_ficha_estu, 
             self.lneEdad_repre_ficha_estu, 
             self.lneCedula_madre_ficha_estu,
-            self.lneFechaIng_ficha_estu,
             self.lneDocente_ficha_estu
         ]
         
