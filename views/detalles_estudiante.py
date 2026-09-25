@@ -15,13 +15,16 @@ from utils.db import get_connection
 from utils.widgets import Switch
 from utils.exportar import (
     generar_constancia_estudios, generar_constancia_estudios_docx, generar_buena_conducta,
+    generar_buena_conducta_docx,
     generar_constancia_inscripcion, generar_constancia_prosecucion_inicial,
+    generar_constancia_prosecucion_inicial_docx,
     generar_constancia_aceptacion,
     generar_buena_conducta_retirado,
     generar_constancia_retiro, generar_historial_estudiante_pdf,
     generar_constancia_retiro_retirado,
     generar_historial_notas_pdf, generar_certificado_promocion_sexto,
-    generar_certificado_promocion_sexto_docx, generar_certificado_prosecucion_primaria
+    generar_certificado_promocion_sexto_docx, generar_certificado_prosecucion_primaria,
+    generar_certificado_prosecucion_primaria_docx
 )
 from utils.sombras import crear_sombra_flotante
 from utils.logo_manager import aplicar_logo_a_label
@@ -130,12 +133,17 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
         menu_exportar_estu.addAction("Constancia de estudios (PDF)", self.exportar_constancia_estudios)
         menu_exportar_estu.addAction("Constancia de estudios (DOCX)", self.exportar_constancia_estudios_docx)
         menu_exportar_estu.addAction("Constancia de buena conducta", self.exportar_buena_conducta)
+        menu_exportar_estu.addAction("Constancia de buena conducta (DOCX)", self.exportar_buena_conducta_docx)
         menu_exportar_estu.addAction("Constancia de buena conducta (retirado)", self.exportar_buena_conducta_retirado)
         menu_exportar_estu.addAction("Constancia de inscripción", self.exportar_constancia_inscripcion)
         menu_exportar_estu.addAction("Constancia de aceptación", self.exportar_constancia_aceptacion)
         menu_exportar_estu.addAction("Constancia prosecución Educación Inicial", 
                                      self.exportar_constancia_prosecucion_inicial)
+        menu_exportar_estu.addAction("Constancia prosecución Educación Inicial (DOCX)", 
+                                     self.exportar_constancia_prosecucion_inicial_docx)
         menu_exportar_estu.addAction("Certif. prosecución primaria", self.exportar_certificado_prosecucion_primaria)
+        menu_exportar_estu.addAction("Certif. prosecución primaria (DOCX)", 
+                                     self.exportar_certificado_prosecucion_primaria_docx)
         menu_exportar_estu.addAction("Certificado promoción 6to a Secundaria",
                                       self.exportar_certificado_promocion_sexto)
         menu_exportar_estu.addAction("Certificado promoción 6to a Secundaria (DOCX)",
@@ -221,7 +229,18 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
             abrir_archivo(archivo)
         except Exception as e:
             crear_msgbox(self, "Error", f"No se pudo generar:\n{e}", QMessageBox.Icon.Critical).exec()
-    
+
+    def exportar_certificado_prosecucion_primaria_docx(self):
+        """Genera certificado de prosecución primaria en formato DOCX."""
+        try:
+            estudiante = self.obtener_estudiante_actual_dict()
+            institucion = InstitucionModel.obtener_por_id(1)
+            archivo = generar_certificado_prosecucion_primaria_docx(estudiante, institucion, self.anio_escolar)
+            crear_msgbox(self, "Éxito", f"Certificado (DOCX) generado:\n{archivo}", QMessageBox.Icon.Information).exec()
+            abrir_archivo(archivo)
+        except Exception as e:
+            crear_msgbox(self, "Error", f"No se pudo generar (DOCX):\n{e}", QMessageBox.Icon.Critical).exec()
+
     def exportar_buena_conducta(self):
         """Genera constancia de buena conducta"""
         try:
@@ -232,6 +251,17 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
             abrir_archivo(archivo)
         except Exception as e:
             crear_msgbox(self, "Error", f"No se pudo generar:\n{e}", QMessageBox.Icon.Critical).exec()
+
+    def exportar_buena_conducta_docx(self):
+        """Genera constancia de buena conducta en formato DOCX."""
+        try:
+            estudiante = self.obtener_estudiante_actual_dict()
+            institucion = InstitucionModel.obtener_por_id(1)
+            archivo = generar_buena_conducta_docx(estudiante, institucion, self.anio_escolar)
+            crear_msgbox(self, "Éxito", f"Constancia (DOCX) generada:\n{archivo}", QMessageBox.Icon.Information).exec()
+            abrir_archivo(archivo)
+        except Exception as e:
+            crear_msgbox(self, "Error", f"No se pudo generar (DOCX):\n{e}", QMessageBox.Icon.Critical).exec()
 
     def exportar_buena_conducta_retirado(self):
         """Genera constancia de buena conducta para estudiante retirado (año anterior)."""
@@ -357,6 +387,75 @@ class DetallesEstudiante(QDialog, Ui_ficha_estu):
             abrir_archivo(archivo)
         except Exception as e:
             crear_msgbox(self, "Error", f"No se pudo generar:\n{e}", QMessageBox.Icon.Critical).exec()
+
+    def exportar_constancia_prosecucion_inicial_docx(self):
+        """Genera constancia de prosecución inicial en formato DOCX."""
+        try:
+            if self.es_egresado:
+                crear_msgbox(
+                    self,
+                    "No disponible",
+                    "Esta constancia solo aplica para estudiantes regulares desde 3er nivel en adelante.",
+                    QMessageBox.Icon.Warning
+                ).exec()
+                return
+
+            tipo_actual = self.cbxTipoEdu_ficha_estu.currentText().strip().lower()
+            grado_actual = self.cbxGrado_ficha_estu.currentText().strip().lower()
+            anio_inicio_actual = int(self.anio_escolar['año_inicio'])
+
+            anio_escolar_inicial = None
+
+            if tipo_actual in ['inicial', 'preescolar'] and '3' in grado_actual:
+                anio_escolar_inicial = {
+                    'año_inicio': anio_inicio_actual,
+                    'año_fin': anio_inicio_actual + 1
+                }
+            elif tipo_actual == 'primaria':
+                historial = EstudianteModel.obtener_historial_estudiante(self.id_estudiante)
+                if not historial:
+                    crear_msgbox(self, "Sin historial", "No hay historial.", QMessageBox.Icon.Warning).exec()
+                    return
+
+                curso_tercer_nivel = next(
+                    (
+                        r for r in historial
+                        if '3' in str(r.get('grado', '')).lower()
+                        and str(r.get('nivel', '')).lower() in ['inicial', 'preescolar']
+                    ),
+                    None
+                )
+
+                if not curso_tercer_nivel:
+                    crear_msgbox(
+                        self,
+                        "No elegible",
+                        "No se encontró registro de 3er nivel de educación inicial para este estudiante.",
+                        QMessageBox.Icon.Warning
+                    ).exec()
+                    return
+
+                anio_inicio_tercer_nivel = int(curso_tercer_nivel['año_inicio'])
+                anio_escolar_inicial = {
+                    'año_inicio': anio_inicio_tercer_nivel,
+                    'año_fin': anio_inicio_tercer_nivel + 1
+                }
+            else:
+                crear_msgbox(
+                    self,
+                    "Estudiante no elegible",
+                    "Esta constancia está disponible desde 3er nivel de inicial en adelante.",
+                    QMessageBox.Icon.Warning
+                ).exec()
+                return
+
+            estudiante = self.obtener_estudiante_actual_dict()
+            institucion = InstitucionModel.obtener_por_id(1)
+            archivo = generar_constancia_prosecucion_inicial_docx(estudiante, institucion, anio_escolar_inicial)
+            crear_msgbox(self, "Éxito", f"Constancia (DOCX) generada:\n{archivo}", QMessageBox.Icon.Information).exec()
+            abrir_archivo(archivo)
+        except Exception as e:
+            crear_msgbox(self, "Error", f"No se pudo generar (DOCX):\n{e}", QMessageBox.Icon.Critical).exec()
 
     def exportar_certificado_promocion_sexto(self):
         """Genera certificado de promoción de 6to a 1er año de secundaria."""

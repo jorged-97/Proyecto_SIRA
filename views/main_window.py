@@ -21,7 +21,10 @@ from utils.exportar import (
     generar_constancia_retiro_retirado,
     generar_historial_estudiante_pdf, generar_historial_notas_pdf,
     generar_certificado_promocion_sexto,
-    generar_certificado_promocion_sexto_docx, generar_certificado_prosecucion_primaria, 
+    generar_certificado_promocion_sexto_docx, generar_certificado_prosecucion_primaria,
+    generar_certificado_prosecucion_primaria_docx,
+    generar_buena_conducta_docx,
+    generar_constancia_prosecucion_inicial_docx,
     generar_listado_colaboracion_seccion
 )
 from utils.backup import BackupManager
@@ -297,9 +300,12 @@ class MainWindow(QMainWindow, UiMainWindowBase):
             "Constancia de inscripción",
             "Constancia de aceptación",
             "Constancia de buena conducta",
+            "Constancia de buena conducta (DOCX)",
             "Constancia de buena conducta (retirado)",
             "Constancia de prosecución inicial",
+            "Constancia de prosecución inicial (DOCX)",
             "Certif. de prosecución primaria",
+            "Certif. de prosecución primaria (DOCX)",
             "Certif. promoción 6to a Secundaria",
             "Certif. promoción 6to a Secundaria (DOCX)",
             "Constancia de retiro (normal)",
@@ -1143,6 +1149,9 @@ class MainWindow(QMainWindow, UiMainWindowBase):
                 elif constancia == "Constancia de buena conducta":
                     archivo = generar_buena_conducta(estudiante, institucion, self.anio_escolar)
 
+                elif constancia == "Constancia de buena conducta (DOCX)":
+                    archivo = generar_buena_conducta_docx(estudiante, institucion, self.anio_escolar)
+
                 elif constancia == "Constancia de buena conducta (retirado)":
                     # Solo para estudiantes retirados
                     estatus_acad = str(datos_bd.get("estatus_academico", "")).strip()
@@ -1187,6 +1196,9 @@ class MainWindow(QMainWindow, UiMainWindowBase):
                 
                 elif constancia == "Certif. de prosecución primaria":
                     archivo = generar_certificado_prosecucion_primaria(estudiante, institucion, self.anio_escolar)
+
+                elif constancia == "Certif. de prosecución primaria (DOCX)":
+                    archivo = generar_certificado_prosecucion_primaria_docx(estudiante, institucion, self.anio_escolar)
 
                 elif constancia == "Constancia de prosecución inicial":
                     tipo_actual = str(datos_bd.get("tipo_educacion", "")).strip().lower()
@@ -1238,6 +1250,57 @@ class MainWindow(QMainWindow, UiMainWindowBase):
                         return
 
                     archivo = generar_constancia_prosecucion_inicial(estudiante, institucion, anio_escolar_inicial)
+
+                elif constancia == "Constancia de prosecución inicial (DOCX)":
+                    tipo_actual = str(datos_bd.get("tipo_educacion", "")).strip().lower()
+                    grado_actual = str(datos_bd.get("grado", "")).strip().lower()
+                    anio_inicio_actual = int(self.anio_escolar['año_inicio'])
+
+                    anio_escolar_inicial = None
+
+                    if tipo_actual in ['inicial', 'preescolar'] and '3' in grado_actual:
+                        anio_escolar_inicial = {
+                            'año_inicio': anio_inicio_actual,
+                            'año_fin': anio_inicio_actual + 1
+                        }
+                    elif tipo_actual == 'primaria':
+                        historial = EstudianteModel.obtener_historial_estudiante(persona_id)
+                        if not historial:
+                            crear_msgbox(self, "Sin historial", "No hay historial académico.", QMessageBox.Icon.Warning).exec()
+                            return
+
+                        curso_tercer_nivel = next(
+                            (
+                                r for r in historial
+                                if '3' in str(r.get('grado', '')).lower()
+                                and str(r.get('nivel', '')).lower() in ['inicial', 'preescolar']
+                            ),
+                            None
+                        )
+                        if not curso_tercer_nivel:
+                            crear_msgbox(
+                                self,
+                                "No elegible",
+                                "No se encontró registro de 3er nivel de educación inicial para este estudiante.",
+                                QMessageBox.Icon.Warning
+                            ).exec()
+                            return
+
+                        anio_inicio_tercer_nivel = int(curso_tercer_nivel['año_inicio'])
+                        anio_escolar_inicial = {
+                            'año_inicio': anio_inicio_tercer_nivel,
+                            'año_fin': anio_inicio_tercer_nivel + 1
+                        }
+                    else:
+                        crear_msgbox(
+                            self,
+                            "Estudiante no elegible",
+                            "Esta constancia está disponible desde 3er nivel de inicial en adelante.",
+                            QMessageBox.Icon.Warning
+                        ).exec()
+                        return
+
+                    archivo = generar_constancia_prosecucion_inicial_docx(estudiante, institucion, anio_escolar_inicial)
 
                 elif constancia == "Certif. promoción 6to a Secundaria":
                     tipo_actual = str(datos_bd.get("tipo_educacion", "")).strip().lower()

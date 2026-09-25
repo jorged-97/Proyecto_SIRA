@@ -971,6 +971,751 @@ def generar_certificado_promocion_sexto_docx(estudiante: dict, institucion: dict
                 pass
 
 
+def generar_buena_conducta_docx(estudiante: dict, institucion: dict, anio_escolar: dict) -> str:
+    """Genera constancia de buena conducta en DOCX para un estudiante."""
+    campos_est = ["Nombres", "Apellidos", "Cédula", "Grado", "Sección"]
+    valido, mensaje = validar_datos_exportacion(estudiante, campos_est)
+    if not valido:
+        raise ValueError(f"Datos de estudiante incompletos: {mensaje}")
+
+    campos_inst = ["director", "director_ci", "nombre"]
+    valido, mensaje = validar_datos_exportacion(institucion, campos_inst)
+    if not valido:
+        raise ValueError(f"Datos de institución incompletos: {mensaje}")
+
+    anio_inicio, anio_fin = extraer_anio_escolar(anio_escolar)
+
+    estudiante["Nombres"] = str(estudiante["Nombres"]).strip().upper()
+    estudiante["Apellidos"] = str(estudiante["Apellidos"]).strip().upper()
+    cedula_normalizada = normalizar_cedula(estudiante["Cédula"], es_estudiante=True)
+    director_ci = normalizar_cedula(institucion['director_ci'])
+
+    carpeta = os.path.join(os.getcwd(), "exportados", "Constancias de buena conducta DOCX")
+    ok, msg = crear_carpeta_segura(carpeta)
+    if not ok:
+        raise IOError(msg)
+
+    nombre_base = sanitizar_nombre_archivo(f"Constancia_buena_conducta_{estudiante['Cédula']}")
+    nombre_archivo = os.path.join(carpeta, f"{nombre_base}.docx")
+
+    try:
+        doc = Document()
+
+        section = doc.sections[0]
+        section.page_width = Cm(21.59)
+        section.page_height = Cm(27.94)
+        section.top_margin = Cm(2.5)
+        section.bottom_margin = Cm(1.5)
+        section.left_margin = Cm(2.5)
+        section.right_margin = Cm(2.5)
+
+        logo_temp_path = None
+        try:
+            logo_datos = obtener_logo_bytes()
+            if logo_datos:
+                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                    tmp.write(logo_datos)
+                    logo_temp_path = tmp.name
+        except Exception:
+            pass
+
+        if not logo_temp_path:
+            logo_path_local = os.path.join(ICON_DIR, "logo_escuela_fondo.png")
+            if os.path.exists(logo_path_local):
+                logo_temp_path = logo_path_local
+
+        if logo_temp_path and os.path.exists(logo_temp_path):
+            p_logo = doc.add_paragraph()
+            p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run_logo = p_logo.add_run()
+            run_logo.add_picture(logo_temp_path, width=Inches(1.0))
+
+        inst_data = InstitucionModel.obtener_por_id(1)
+        nombre_inst = str(inst_data.get("nombre", "")).upper() if inst_data else ""
+        codigo_inst = str(inst_data.get("codigo_dea", "")) if inst_data else ""
+
+        lineas_membrete = [
+            "REPÚBLICA BOLIVARIANA DE VENEZUELA",
+            "MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN",
+            nombre_inst,
+            f"CÓDIGO DEA: {codigo_inst}",
+            "PUERTO LA CRUZ, EDO. ANZOÁTEGUI"
+        ]
+        for linea in lineas_membrete:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.space_after = Pt(1)
+            p.paragraph_format.space_before = Pt(0)
+            run = p.add_run(linea)
+            run.font.size = Pt(10)
+            run.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(12)
+
+        p_titulo = doc.add_paragraph()
+        p_titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_titulo.paragraph_format.space_after = Pt(12)
+        run_titulo = p_titulo.add_run("CONSTANCIA DE BUENA CONDUCTA")
+        run_titulo.bold = True
+        run_titulo.font.size = Pt(16)
+        run_titulo.font.name = "Arial"
+
+        p_texto = doc.add_paragraph()
+        p_texto.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_texto.paragraph_format.space_after = Pt(0)
+
+        runs_data = [
+            ("El suscrito, Director ", False),
+            (f"PROF. {institucion['director'].upper()}", True),
+            (", portador de la Cédula de Identidad ", False),
+            (director_ci, True),
+            (f", de la {institucion['nombre']}, que funciona en Puerto La Cruz, "
+             f"hace constar que el alumno(a): ", False),
+            (f"{estudiante['Apellidos']} {estudiante['Nombres']}", True),
+            (", portador de la cédula de identidad ", False),
+            (cedula_normalizada, True),
+            (", estudiante del ", False),
+            (f"{estudiante['Grado']} Grado Sección '{estudiante['Sección']}'", True),
+            (" de Educación Primaria durante el Año Escolar ", False),
+            (f"{anio_inicio}-{anio_fin}", True),
+            (", mantuvo una ", False),
+            ("Buena Conducta", True),
+            (" durante su permanencia en esta institución educativa.", False),
+        ]
+
+        for texto_run, is_bold in runs_data:
+            run = p_texto.add_run(texto_run)
+            run.bold = is_bold
+            run.font.size = Pt(12)
+            run.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(20)
+
+        fecha_hoy = date.today()
+        dia = fecha_hoy.day
+        mes_nombre = fecha_hoy.strftime("%B").upper()
+        meses = {
+            'JANUARY': 'ENERO', 'FEBRUARY': 'FEBRERO', 'MARCH': 'MARZO',
+            'APRIL': 'ABRIL', 'MAY': 'MAYO', 'JUNE': 'JUNIO',
+            'JULY': 'JULIO', 'AUGUST': 'AGOSTO', 'SEPTEMBER': 'SEPTIEMBRE',
+            'OCTOBER': 'OCTUBRE', 'NOVEMBER': 'NOVIEMBRE', 'DECEMBER': 'DICIEMBRE'
+        }
+        mes_es = meses.get(mes_nombre, mes_nombre)
+        anio = fecha_hoy.year
+
+        p_fecha = doc.add_paragraph()
+        p_fecha.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_fecha.paragraph_format.space_after = Pt(0)
+
+        fecha_runs = [
+            ("Certificado que se expide en ", False),
+            ("PUERTO LA CRUZ", True),
+            (", a los ", False),
+            (str(dia), True),
+            (" días del mes de ", False),
+            (mes_es, True),
+            (" de ", False),
+            (str(anio), True),
+        ]
+        for texto_run, is_bold in fecha_runs:
+            run = p_fecha.add_run(texto_run)
+            run.bold = is_bold
+            run.font.size = Pt(12)
+            run.font.name = "Arial"
+
+        for _ in range(5):
+            sp = doc.add_paragraph()
+            sp.paragraph_format.space_after = Pt(0)
+            sp.paragraph_format.space_before = Pt(0)
+
+        p_linea = doc.add_paragraph()
+        p_linea.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_linea.paragraph_format.space_after = Pt(3)
+        run_linea = p_linea.add_run("________________________")
+        run_linea.font.size = Pt(12)
+        run_linea.font.name = "Arial"
+
+        p_director = doc.add_paragraph()
+        p_director.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_director.paragraph_format.space_after = Pt(3)
+        run_dir = p_director.add_run(f"Prof. {institucion['director']}")
+        run_dir.font.size = Pt(12)
+        run_dir.font.name = "Arial"
+
+        p_ci = doc.add_paragraph()
+        p_ci.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_ci.paragraph_format.space_after = Pt(3)
+        run_ci = p_ci.add_run(f"C.I. {director_ci}")
+        run_ci.font.size = Pt(12)
+        run_ci.font.name = "Arial"
+
+        p_cargo = doc.add_paragraph()
+        p_cargo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run_cargo = p_cargo.add_run("Director")
+        run_cargo.font.size = Pt(12)
+        run_cargo.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(6)
+
+        if inst_data:
+            direccion = str(inst_data.get("direccion", "")).upper()
+            telefono = str(inst_data.get("telefono", ""))
+            correo = str(inst_data.get("correo", "")).upper()
+
+            line1 = f"DIRECCIÓN: {direccion}" if direccion else ""
+            line2 = f"TELÉFONO: {telefono} | CORREO: {correo}" if telefono or correo else ""
+
+            for linea_pie in [line1, line2]:
+                if linea_pie.strip():
+                    p_pie = doc.add_paragraph()
+                    p_pie.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    p_pie.paragraph_format.space_after = Pt(1)
+                    run_pie = p_pie.add_run(linea_pie)
+                    run_pie.font.size = Pt(10)
+                    run_pie.font.name = "Arial"
+
+        doc.save(nombre_archivo)
+        return nombre_archivo
+
+    except Exception as e:
+        raise IOError(f"Error generando DOCX: {e}")
+    finally:
+        if logo_temp_path and logo_temp_path != os.path.join(ICON_DIR, "logo_escuela_fondo.png"):
+            try:
+                os.unlink(logo_temp_path)
+            except OSError:
+                pass
+
+
+def generar_constancia_prosecucion_inicial_docx(estudiante: dict, institucion: dict, anio_escolar: dict) -> str:
+    """Genera constancia de prosecución de educación inicial a primaria en DOCX."""
+    campos_est = ["Nombres", "Apellidos", "Cédula", "Ciudad", "Fecha Nac."]
+    valido, mensaje = validar_datos_exportacion(estudiante, campos_est)
+    if not valido:
+        raise ValueError(f"Datos de estudiante incompletos: {mensaje}")
+
+    campos_inst = ["director", "director_ci", "nombre"]
+    valido, mensaje = validar_datos_exportacion(institucion, campos_inst)
+    if not valido:
+        raise ValueError(f"Datos de institución incompletos: {mensaje}")
+
+    anio_inicio, anio_fin = extraer_anio_escolar(anio_escolar)
+
+    anio_inicio_form = formatear_anio(anio_inicio)
+    anio_fin_form = formatear_anio(anio_fin)
+
+    estudiante["Nombres"] = str(estudiante["Nombres"]).strip().upper()
+    estudiante["Apellidos"] = str(estudiante["Apellidos"]).strip().upper()
+    cedula_normalizada = normalizar_cedula(estudiante["Cédula"], es_estudiante=True)
+    fecha_nac_str = convertir_fecha_string(estudiante['Fecha Nac.'])
+
+    carpeta = os.path.join(os.getcwd(), "exportados", "Constancias de prosecución inicial DOCX")
+    ok, msg = crear_carpeta_segura(carpeta)
+    if not ok:
+        raise IOError(msg)
+
+    nombre_base = sanitizar_nombre_archivo(f"Constancia_prosecucion_inicial_{estudiante['Cédula']}")
+    nombre_archivo = os.path.join(carpeta, f"{nombre_base}.docx")
+
+    temp_files = []
+
+    try:
+        doc = Document()
+
+        section = doc.sections[0]
+        section.page_width = Cm(21.59)
+        section.page_height = Cm(27.94)
+        section.top_margin = Cm(2.5)
+        section.bottom_margin = Cm(1.5)
+        section.left_margin = Cm(2.5)
+        section.right_margin = Cm(2.5)
+
+        logo_ministerio_png = None
+        logo_venezuela_png = None
+
+        logo_ministerio_local = os.path.join(ICON_DIR, "ministerio.png")
+        if os.path.exists(logo_ministerio_local):
+            logo_ministerio_png = _asegurar_png_compatible(logo_ministerio_local)
+            if logo_ministerio_png != logo_ministerio_local:
+                temp_files.append(logo_ministerio_png)
+
+        logo_venezuela_local = os.path.join(ICON_DIR, "Escudo_Venezuela.png")
+        if os.path.exists(logo_venezuela_local):
+            logo_venezuela_png = _asegurar_png_compatible(logo_venezuela_local)
+            if logo_venezuela_png != logo_venezuela_local:
+                temp_files.append(logo_venezuela_png)
+
+        if logo_ministerio_png:
+            p_logo_min = doc.add_paragraph()
+            p_logo_min.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            run_logo_min = p_logo_min.add_run()
+            run_logo_min.add_picture(logo_ministerio_png, width=Inches(1.8))
+
+        if logo_venezuela_png:
+            p_logo_ven = doc.add_paragraph()
+            p_logo_ven.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run_logo_ven = p_logo_ven.add_run()
+            run_logo_ven.add_picture(logo_venezuela_png, width=Inches(0.65))
+
+        inst_data = InstitucionModel.obtener_por_id(1)
+        nombre_inst = str(inst_data.get("nombre", "")).upper() if inst_data else ""
+        codigo_inst = str(inst_data.get("codigo_dea", "")) if inst_data else ""
+
+        lineas_membrete = [
+            "REPÚBLICA BOLIVARIANA DE VENEZUELA",
+            "MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN",
+            nombre_inst,
+            f"CÓDIGO DEA: {codigo_inst}",
+            "PUERTO LA CRUZ, EDO. ANZOÁTEGUI"
+        ]
+        for linea in lineas_membrete:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.space_after = Pt(1)
+            p.paragraph_format.space_before = Pt(0)
+            run = p.add_run(linea)
+            run.font.size = Pt(10)
+            run.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(12)
+
+        p_titulo = doc.add_paragraph()
+        p_titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_titulo.paragraph_format.space_after = Pt(12)
+        run_titulo = p_titulo.add_run("CONSTANCIA DE PROSECUCIÓN")
+        run_titulo.bold = True
+        run_titulo.font.size = Pt(16)
+        run_titulo.font.name = "Arial"
+        run_titulo.add_break()
+        run_titulo2 = p_titulo.add_run("EN EL NIVEL DE EDUCACIÓN INICIAL")
+        run_titulo2.bold = True
+        run_titulo2.font.size = Pt(16)
+        run_titulo2.font.name = "Arial"
+
+        director_ci = normalizar_cedula(institucion['director_ci'])
+
+        p_texto = doc.add_paragraph()
+        p_texto.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_texto.paragraph_format.space_after = Pt(0)
+
+        runs_data = [
+            ("Quien suscribe ", False),
+            (institucion['director'].upper(), True),
+            (" titular de la Cédula de Identidad Nº ", False),
+            (director_ci, True),
+            (" Director(a) de la Institución Educativa ", False),
+            (institucion['nombre'].upper(), True),
+            (", ubicada en el Municipio ", False),
+            ("JUAN ANTONIO SOTILLO", True),
+            (" de la Parroquia ", False),
+            ("PUERTO LA CRUZ", True),
+            (" adscrita al Centro de Desarrollo de la Calidad Educativa Estadal ", False),
+            ("ANZOÁTEGUI", True),
+            (". Por la presente certifica que el (la) estudiante ", False),
+            (f"{estudiante['Apellidos']} {estudiante['Nombres']}", True),
+            (" titular de Cédula Escolar ", False),
+            (cedula_normalizada, True),
+            (", nacido (a) en el municipio ", False),
+            (estudiante['Ciudad'], True),
+            (" del Estado ", False),
+            ("ANZOÁTEGUI", True),
+            (" en fecha ", False),
+            (fecha_nac_str, True),
+            (", cursó el ", False),
+            ("3er nivel", True),
+            (" de la etapa de ", False),
+            ("Educación Inicial", True),
+            (" durante el periodo escolar ", False),
+            (f"{anio_inicio_form}-{anio_fin_form}", True),
+            (", siendo promovido(a) a ", False),
+            ("primer grado de primaria", True),
+            (", previo cumplimiento a los requisitos establecidos en la normativa legal vigente.", False),
+        ]
+
+        for texto_run, is_bold in runs_data:
+            run = p_texto.add_run(texto_run)
+            run.bold = is_bold
+            run.font.size = Pt(12)
+            run.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(20)
+
+        fecha_hoy = date.today()
+        anio_actual = fecha_hoy.year
+        anio_actual_form = formatear_anio(anio_actual)
+
+        p_fecha = doc.add_paragraph()
+        p_fecha.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_fecha.paragraph_format.space_after = Pt(0)
+
+        fecha_runs = [
+            ("Certificado que se expide en ", False),
+            ("PUERTO LA CRUZ", True),
+            (", a los ", False),
+            ("30", True),
+            (" días del mes de ", False),
+            ("Julio", True),
+            (" de ", False),
+            (anio_actual_form, True),
+        ]
+        for texto_run, is_bold in fecha_runs:
+            run = p_fecha.add_run(texto_run)
+            run.bold = is_bold
+            run.font.size = Pt(12)
+            run.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(12)
+
+        tabla_firmas = doc.add_table(rows=5, cols=2)
+        tabla_firmas.alignment = WD_TABLE_ALIGNMENT.CENTER
+        tabla_firmas.style = 'Table Grid'
+
+        def _set_cell_text(cell, text, bold=False, size=10, alignment=WD_ALIGN_PARAGRAPH.CENTER):
+            cell.text = ""
+            p = cell.paragraphs[0]
+            p.alignment = alignment
+            p.paragraph_format.space_before = Pt(2)
+            p.paragraph_format.space_after = Pt(2)
+            run = p.add_run(text)
+            run.bold = bold
+            run.font.size = Pt(size)
+            run.font.name = "Arial"
+
+        def _set_cell_multi_line(cell, lines_data, alignment=WD_ALIGN_PARAGRAPH.CENTER):
+            cell.text = ""
+            for i, (text, bold, size) in enumerate(lines_data):
+                if i == 0:
+                    p = cell.paragraphs[0]
+                else:
+                    p = cell.add_paragraph()
+                p.alignment = alignment
+                p.paragraph_format.space_before = Pt(1)
+                p.paragraph_format.space_after = Pt(1)
+                run = p.add_run(text)
+                run.bold = bold
+                run.font.size = Pt(size)
+                run.font.name = "Arial"
+
+        _set_cell_multi_line(tabla_firmas.rows[0].cells[0], [
+            ("INSTITUCIÓN EDUCATIVA", True, 9),
+            ("(PARA VALIDEZ NACIONAL)", True, 9),
+        ])
+        _set_cell_multi_line(tabla_firmas.rows[0].cells[1], [
+            ("CENTRO DE DESARROLLO DE LA CALIDAD", True, 9),
+            ("EDUCATIVA ESTADAL", True, 9),
+            ("(PARA VALIDEZ INTERNACIONAL)", True, 9),
+        ])
+
+        _set_cell_text(tabla_firmas.rows[1].cells[0], "DIRECTOR(A)", bold=True, size=10)
+        _set_cell_text(tabla_firmas.rows[1].cells[1], "DIRECTOR(A)", bold=True, size=10)
+
+        _set_cell_text(tabla_firmas.rows[2].cells[0],
+                       f"Nombre y Apellido: {institucion['director'].upper()}",
+                       bold=False, size=10, alignment=WD_ALIGN_PARAGRAPH.LEFT)
+        _set_cell_text(tabla_firmas.rows[2].cells[1],
+                       "Nombre y Apellido:",
+                       bold=False, size=10, alignment=WD_ALIGN_PARAGRAPH.LEFT)
+
+        _set_cell_text(tabla_firmas.rows[3].cells[0],
+                       f"Número de C.I: {director_ci}",
+                       bold=False, size=10, alignment=WD_ALIGN_PARAGRAPH.LEFT)
+        _set_cell_text(tabla_firmas.rows[3].cells[1],
+                       "Número de C.I:",
+                       bold=False, size=10, alignment=WD_ALIGN_PARAGRAPH.LEFT)
+
+        _set_cell_multi_line(tabla_firmas.rows[4].cells[0], [
+            ("Firma y Sello:", False, 10),
+            ("", False, 10),
+            ("", False, 10),
+        ], alignment=WD_ALIGN_PARAGRAPH.LEFT)
+        _set_cell_multi_line(tabla_firmas.rows[4].cells[1], [
+            ("Firma y Sello:", False, 10),
+            ("", False, 10),
+            ("", False, 10),
+        ], alignment=WD_ALIGN_PARAGRAPH.LEFT)
+
+        doc.save(nombre_archivo)
+        return nombre_archivo
+
+    except Exception as e:
+        raise IOError(f"Error generando DOCX: {e}")
+    finally:
+        for tmp in temp_files:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+def generar_certificado_prosecucion_primaria_docx(estudiante: dict, institucion: dict, anio_escolar: dict) -> str:
+    """Genera certificado de prosecución de primaria en DOCX."""
+    campos_est = ["Nombres", "Apellidos", "Cédula", "Ciudad", "Fecha Nac."]
+    valido, mensaje = validar_datos_exportacion(estudiante, campos_est)
+    if not valido:
+        raise ValueError(f"Datos de estudiante incompletos: {mensaje}")
+
+    campos_inst = ["director", "director_ci", "nombre"]
+    valido, mensaje = validar_datos_exportacion(institucion, campos_inst)
+    if not valido:
+        raise ValueError(f"Datos de institución incompletos: {mensaje}")
+
+    anio_inicio, anio_fin = extraer_anio_escolar(anio_escolar)
+
+    anio_inicio_form = formatear_anio(anio_inicio)
+    anio_fin_form = formatear_anio(anio_fin)
+
+    estudiante["Nombres"] = str(estudiante["Nombres"]).strip().upper()
+    estudiante["Apellidos"] = str(estudiante["Apellidos"]).strip().upper()
+    cedula_normalizada = normalizar_cedula(estudiante["Cédula"], es_estudiante=True)
+    fecha_nac_str = convertir_fecha_string(estudiante['Fecha Nac.'])
+    grado_estudiante = str(estudiante.get("Grado", "")).strip()
+    seccion_estudiante = str(estudiante.get("Sección", "")).strip()
+
+    carpeta = os.path.join(os.getcwd(), "exportados", "Constancias de prosecución primaria DOCX")
+    ok, msg = crear_carpeta_segura(carpeta)
+    if not ok:
+        raise IOError(msg)
+
+    nombre_base = sanitizar_nombre_archivo(f"Constancia_prosecucion_primaria_{estudiante['Cédula']}")
+    nombre_archivo = os.path.join(carpeta, f"{nombre_base}.docx")
+
+    temp_files = []
+
+    try:
+        doc = Document()
+
+        section = doc.sections[0]
+        section.page_width = Cm(21.59)
+        section.page_height = Cm(27.94)
+        section.top_margin = Cm(2.5)
+        section.bottom_margin = Cm(1.5)
+        section.left_margin = Cm(2.5)
+        section.right_margin = Cm(2.5)
+
+        logo_ministerio_png = None
+        logo_venezuela_png = None
+
+        logo_ministerio_local = os.path.join(ICON_DIR, "ministerio.png")
+        if os.path.exists(logo_ministerio_local):
+            logo_ministerio_png = _asegurar_png_compatible(logo_ministerio_local)
+            if logo_ministerio_png != logo_ministerio_local:
+                temp_files.append(logo_ministerio_png)
+
+        logo_venezuela_local = os.path.join(ICON_DIR, "Escudo_Venezuela.png")
+        if os.path.exists(logo_venezuela_local):
+            logo_venezuela_png = _asegurar_png_compatible(logo_venezuela_local)
+            if logo_venezuela_png != logo_venezuela_local:
+                temp_files.append(logo_venezuela_png)
+
+        if logo_ministerio_png:
+            p_logo_min = doc.add_paragraph()
+            p_logo_min.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            run_logo_min = p_logo_min.add_run()
+            run_logo_min.add_picture(logo_ministerio_png, width=Inches(1.8))
+
+        if logo_venezuela_png:
+            p_logo_ven = doc.add_paragraph()
+            p_logo_ven.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run_logo_ven = p_logo_ven.add_run()
+            run_logo_ven.add_picture(logo_venezuela_png, width=Inches(0.65))
+
+        inst_data = InstitucionModel.obtener_por_id(1)
+        nombre_inst = str(inst_data.get("nombre", "")).upper() if inst_data else ""
+        codigo_inst = str(inst_data.get("codigo_dea", "")) if inst_data else ""
+
+        lineas_membrete = [
+            "REPÚBLICA BOLIVARIANA DE VENEZUELA",
+            "MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN",
+            nombre_inst,
+            f"CÓDIGO DEA: {codigo_inst}",
+            "PUERTO LA CRUZ, EDO. ANZOÁTEGUI"
+        ]
+        for linea in lineas_membrete:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.space_after = Pt(1)
+            p.paragraph_format.space_before = Pt(0)
+            run = p.add_run(linea)
+            run.font.size = Pt(10)
+            run.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(12)
+
+        p_titulo = doc.add_paragraph()
+        p_titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_titulo.paragraph_format.space_after = Pt(12)
+        run_titulo = p_titulo.add_run("CERTIFICADO")
+        run_titulo.bold = True
+        run_titulo.font.size = Pt(16)
+        run_titulo.font.name = "Arial"
+        run_titulo.add_break()
+        run_titulo2 = p_titulo.add_run("DE PROSECUCIÓN PRIMARIA")
+        run_titulo2.bold = True
+        run_titulo2.font.size = Pt(16)
+        run_titulo2.font.name = "Arial"
+
+        director_ci = normalizar_cedula(institucion['director_ci'])
+        grado_siguiente = MAPA_GRADOS.get(grado_estudiante, "Grado desconocido.")
+
+        p_texto = doc.add_paragraph()
+        p_texto.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_texto.paragraph_format.space_after = Pt(0)
+
+        runs_data = [
+            ("Quien suscribe ", False),
+            (institucion['director'].upper(), True),
+            (" titular de la Cédula de Identidad Nº ", False),
+            (director_ci, True),
+            (" Director(a) de la Institución Educativa ", False),
+            (institucion['nombre'].upper(), True),
+            (", ubicada en el Municipio ", False),
+            ("JUAN ANTONIO SOTILLO", True),
+            (" de la Parroquia ", False),
+            ("PUERTO LA CRUZ", True),
+            (" adscrita al Centro de Desarrollo de la Calidad Educativa Estadal ", False),
+            ("ANZOÁTEGUI", True),
+            (". Por la presente certifica que el (la) estudiante ", False),
+            (f"{estudiante['Apellidos']} {estudiante['Nombres']}", True),
+            (" titular de Cédula Escolar ", False),
+            (cedula_normalizada, True),
+            (", nacido (a) en el municipio ", False),
+            (estudiante['Ciudad'], True),
+            (" del Estado ", False),
+            ("ANZOÁTEGUI", True),
+            (" en fecha ", False),
+            (fecha_nac_str, True),
+            (", cursó el ", False),
+            (f"{grado_estudiante} Grado", True),
+            (" correspondiéndole el literal ", False),
+            (seccion_estudiante, True),
+            (" durante el periodo escolar ", False),
+            (f"{anio_inicio_form}-{anio_fin_form}", True),
+            (", siendo promovido(a) al ", False),
+            (f"{grado_siguiente} Grado de Educación Primaria", True),
+            (", previo cumplimiento a los requisitos establecidos en la normativa legal vigente.", False),
+        ]
+
+        for texto_run, is_bold in runs_data:
+            run = p_texto.add_run(texto_run)
+            run.bold = is_bold
+            run.font.size = Pt(12)
+            run.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(20)
+
+        fecha_hoy = date.today()
+        dia = fecha_hoy.day
+        mes_nombre = fecha_hoy.strftime("%B").upper()
+        meses = {
+            'JANUARY': 'ENERO', 'FEBRUARY': 'FEBRERO', 'MARCH': 'MARZO',
+            'APRIL': 'ABRIL', 'MAY': 'MAYO', 'JUNE': 'JUNIO',
+            'JULY': 'JULIO', 'AUGUST': 'AGOSTO', 'SEPTEMBER': 'SEPTIEMBRE',
+            'OCTOBER': 'OCTUBRE', 'NOVEMBER': 'NOVIEMBRE', 'DECEMBER': 'DICIEMBRE'
+        }
+        mes_es = meses.get(mes_nombre, mes_nombre)
+        anio = fecha_hoy.year
+
+        p_fecha = doc.add_paragraph()
+        p_fecha.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_fecha.paragraph_format.space_after = Pt(0)
+
+        fecha_runs = [
+            ("Certificado que se expide en ", False),
+            ("PUERTO LA CRUZ", True),
+            (", a los ", False),
+            (str(dia), True),
+            (" días del mes de ", False),
+            (mes_es, True),
+            (" de ", False),
+            (str(anio), True),
+        ]
+        for texto_run, is_bold in fecha_runs:
+            run = p_fecha.add_run(texto_run)
+            run.bold = is_bold
+            run.font.size = Pt(12)
+            run.font.name = "Arial"
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(12)
+
+        tabla_firmas = doc.add_table(rows=5, cols=2)
+        tabla_firmas.alignment = WD_TABLE_ALIGNMENT.CENTER
+        tabla_firmas.style = 'Table Grid'
+
+        def _set_cell_text(cell, text, bold=False, size=10, alignment=WD_ALIGN_PARAGRAPH.CENTER):
+            cell.text = ""
+            p = cell.paragraphs[0]
+            p.alignment = alignment
+            p.paragraph_format.space_before = Pt(2)
+            p.paragraph_format.space_after = Pt(2)
+            run = p.add_run(text)
+            run.bold = bold
+            run.font.size = Pt(size)
+            run.font.name = "Arial"
+
+        def _set_cell_multi_line(cell, lines_data, alignment=WD_ALIGN_PARAGRAPH.CENTER):
+            cell.text = ""
+            for i, (text, bold, size) in enumerate(lines_data):
+                if i == 0:
+                    p = cell.paragraphs[0]
+                else:
+                    p = cell.add_paragraph()
+                p.alignment = alignment
+                p.paragraph_format.space_before = Pt(1)
+                p.paragraph_format.space_after = Pt(1)
+                run = p.add_run(text)
+                run.bold = bold
+                run.font.size = Pt(size)
+                run.font.name = "Arial"
+
+        _set_cell_multi_line(tabla_firmas.rows[0].cells[0], [
+            ("INSTITUCIÓN EDUCATIVA", True, 9),
+            ("(PARA VALIDEZ NACIONAL)", True, 9),
+        ])
+        _set_cell_multi_line(tabla_firmas.rows[0].cells[1], [
+            ("CENTRO DE DESARROLLO DE LA CALIDAD", True, 9),
+            ("EDUCATIVA ESTADAL", True, 9),
+            ("(PARA VALIDEZ INTERNACIONAL)", True, 9),
+        ])
+
+        _set_cell_text(tabla_firmas.rows[1].cells[0], "DIRECTOR(A)", bold=True, size=10)
+        _set_cell_text(tabla_firmas.rows[1].cells[1], "DIRECTOR(A)", bold=True, size=10)
+
+        _set_cell_text(tabla_firmas.rows[2].cells[0],
+                       f"Nombre y Apellido: {institucion['director'].upper()}",
+                       bold=False, size=10, alignment=WD_ALIGN_PARAGRAPH.LEFT)
+        _set_cell_text(tabla_firmas.rows[2].cells[1],
+                       "Nombre y Apellido:",
+                       bold=False, size=10, alignment=WD_ALIGN_PARAGRAPH.LEFT)
+
+        _set_cell_text(tabla_firmas.rows[3].cells[0],
+                       f"Número de C.I: {director_ci}",
+                       bold=False, size=10, alignment=WD_ALIGN_PARAGRAPH.LEFT)
+        _set_cell_text(tabla_firmas.rows[3].cells[1],
+                       "Número de C.I:",
+                       bold=False, size=10, alignment=WD_ALIGN_PARAGRAPH.LEFT)
+
+        _set_cell_multi_line(tabla_firmas.rows[4].cells[0], [
+            ("Firma y Sello:", False, 10),
+            ("", False, 10),
+            ("", False, 10),
+        ], alignment=WD_ALIGN_PARAGRAPH.LEFT)
+        _set_cell_multi_line(tabla_firmas.rows[4].cells[1], [
+            ("Firma y Sello:", False, 10),
+            ("", False, 10),
+            ("", False, 10),
+        ], alignment=WD_ALIGN_PARAGRAPH.LEFT)
+
+        doc.save(nombre_archivo)
+        return nombre_archivo
+
+    except Exception as e:
+        raise IOError(f"Error generando DOCX: {e}")
+    finally:
+        for tmp in temp_files:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
 def generar_buena_conducta(estudiante: dict, institucion: dict, anio_escolar: dict) -> str:
     """Genera constancia de buena conducta en PDF para un estudiante."""
     # Validar datos
